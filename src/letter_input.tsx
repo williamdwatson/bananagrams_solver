@@ -21,12 +21,18 @@ interface LetterInputProps {
     running: boolean
 }
 
-export default function LetterInput(props: LetterInputProps){
+/**
+ * Displays the letter number inputs, along with the input dialog and buttons
+ * 
+ * @component
+ */
+export default function LetterInput(props: LetterInputProps) {
+    const UPPERCASE_LETTERS = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
     const m = new Map();
     const num_letters = new Map<string, number>();
     const invalid = new Map<string, boolean>();
     const how_many = [13, 3, 3, 6, 18, 3, 4, 3, 12, 2, 2, 5, 3, 8, 11, 3, 2, 9, 6, 9, 6, 3, 3, 2, 3, 2];
-    [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"].forEach((c, i) => {
+    UPPERCASE_LETTERS.forEach((c, i) => {
         m.set(c, 0);
         num_letters.set(c, how_many[i]);
         invalid.set(c, false);
@@ -36,6 +42,7 @@ export default function LetterInput(props: LetterInputProps){
     const [typeInVisible, setTypeInVisible] = useState(false);
     const [typedIn, setTypedIn] = useState("");
 
+    // Focus the input (requires a timeout since the dialog auto-focuses the "X")
     useEffect(() => {
         if (typeInVisible) {
             setTimeout(() => document.getElementById("typeIn")?.focus(), 100);
@@ -85,7 +92,7 @@ export default function LetterInput(props: LetterInputProps){
      */
     const useLetters = () => {
         const new_map = new Map<string, number>();
-        [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"].forEach(c => {
+        UPPERCASE_LETTERS.forEach(c => {
             new_map.set(c, count_letter_in_string(c, typedIn));
         });
         setLetterNums(new_map);
@@ -106,7 +113,7 @@ export default function LetterInput(props: LetterInputProps){
         }
         else {
             const letters = new Map<string, number>();
-            [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"].forEach(c => {
+            UPPERCASE_LETTERS.forEach(c => {
                 letters.set(c, letterNums.get(c) ?? 0);
             });
             props.startRunning(letters);
@@ -121,7 +128,7 @@ export default function LetterInput(props: LetterInputProps){
             <Button label="Use letters" style={{marginTop: "5px", marginRight: "5px"}} onClick={useLetters}/>
             <Button label="Cancel" severity="secondary" onClick={() => {setTypedIn(""); setTypeInVisible(false)}}/>
         </Dialog>
-        {[..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"].map(c => {
+        {UPPERCASE_LETTERS.map(c => {
             return <span style={{marginLeft: "5px", display: "inline-block"}} key={"span-"+c}><label htmlFor={"char-"+c} style={{display: "inline-block", minWidth: "20px"}}>{c}:</label>
             <InputNumber inputId={"char-"+c} value={letterNums.get(c)} onValueChange={e => changeLetterNum(c, e)} min={0} size={1} showButtons inputStyle={{padding: "5px", width: "3rem"}} incrementButtonClassName="input-button-type" decrementButtonClassName="input-button-type" className={lettersInvalid.get(c) ? "p-invalid" : undefined} style={{marginTop: "5px", paddingLeft: "5px"}}/></span>
         })}

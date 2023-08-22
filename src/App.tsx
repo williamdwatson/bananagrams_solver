@@ -14,11 +14,14 @@ function App() {
     const [running, setRunning] = useState(false);
     const [results, setResults] = useState<string[][]>([]);
 
+    /**
+     * Runs the solver
+     * @param letters A mapping of every character to the number of times it's present in the hand
+     */
     const startRunning = (letters: Map<string, number>) => {
         setRunning(true);
         invoke("play_bananagrams", { availableLetters: letters })
             .then(res => {
-                console.log(res);
                 setResults(res as string[][]);
             })
             .catch(error => {

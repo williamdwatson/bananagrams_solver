@@ -5,6 +5,11 @@ interface ResultsDisplayProps {
     results: string[][]
 }
 
+/**
+ * Displays the board solution
+ * 
+ * @component
+ */
 export default function ResultsDisplay(props: ResultsDisplayProps) {
     return (
         <>
