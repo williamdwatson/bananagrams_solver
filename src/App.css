@@ -1,0 +1,30 @@
+body {
+  font-family: sans-serif;
+}
+
+tbody {
+  align-items: center;
+  display: inline-block;
+}
+
+tr {
+  height: 1rem;
+}
+
+.occupiedCell {
+  padding: 5px;
+  background-color: #dfd989;
+  font-weight: bold;
+  border-radius: 5px;
+  width: 1.75rem;
+  text-align: center;
+}
+
+.emptyCell {
+  padding: 5px;
+  width: 1.75rem;
+}
+
+.input-button-type {
+  width: 1rem !important;
+}
