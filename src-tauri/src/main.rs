@@ -591,111 +591,117 @@ async fn play_bananagrams(available_letters: HashMap<String, usize>, state: Stat
         }
     }
     let valid_words_vec: Vec<Vec<usize>> = state.all_words_short.iter().filter(|word| is_makeable(word, letters)).map(|word| word.clone()).collect();
-    let default_parallelism_approx = thread::available_parallelism().unwrap_or(NonZeroUsize::new(1).expect("Failed to create default NonZeroUsize")).get();
-    let chunk_size = (valid_words_vec.len() as f32)/(default_parallelism_approx as f32);
-    let chunks: Vec<Vec<Vec<usize>>> = valid_words_vec.chunks(chunk_size.ceil() as usize).map(|words| words.to_vec()).collect();
-    let stop = Arc::new(AtomicBool::new(false));
-    let mut handles: Vec<thread::JoinHandle<()>> = Vec::with_capacity(chunks.len());
-    let char_vec: Vec<Vec<Vec<char>>> = Vec::new();
-    let ret_val = Arc::new(Mutex::new(char_vec));
-    for chunk in chunks.into_iter() {
-        let stop_t = stop.clone();
-        let mut new_letters = letters.clone();
-        let copied_new_valid_words_vec = valid_words_vec.clone();
-        let conn = ret_val.clone();
-        let handle = thread::spawn(move || {
-            for word in chunk.iter() {
-                let mut board: Array2D<usize> = Array2D::filled_with(EMPTY_VALUE, BOARD_SIZE, BOARD_SIZE);
-                let col_start = BOARD_SIZE/2 - word.len()/2;
-                let row = BOARD_SIZE/2;
-                for i in 0..word.len() {
-                    board[(row, col_start+i)] = word[i];
-                    new_letters[board[(row, col_start+i)]] -= 1;
-                }
-                let min_col = col_start;
-                let min_row = row;
-                let max_col = col_start + (word.len()-1);
-                let max_row = row;
-                let word_letters: HashSet<&usize> = HashSet::from_iter(word.iter());
-                let new_valid_words_vec: Vec<Vec<usize>> = copied_new_valid_words_vec.iter().filter(|word| check_filter_after_play(new_letters, word, &word_letters)).map(|word| word.clone()).collect();
-                let new_valid_words_set: HashSet<Vec<usize>> = HashSet::from_iter(new_valid_words_vec.clone());
-                let result = play_further(&mut board, min_col, max_col, min_row, max_row, &new_valid_words_vec, &new_valid_words_set, letters, 0, &stop_t);
-                match result {
-                    Ok(res) => {
-                        if res.0 {
-                            let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
-                            ret.push(board_to_vec(&board, res.1, res.2, res.3, res.4));
-                            stop_t.store(true, Ordering::Relaxed);
+    if valid_words_vec.len() > 0 {
+        let default_parallelism_approx = cmp::min(thread::available_parallelism().unwrap_or(NonZeroUsize::new(1).expect("Failed to create default NonZeroUsize")).get(), valid_words_vec.len());
+        let chunk_size = (valid_words_vec.len() as f32)/(default_parallelism_approx as f32);
+        let chunks: Vec<Vec<Vec<usize>>> = valid_words_vec.chunks(chunk_size.ceil() as usize).map(|words| words.to_vec()).collect();
+        let stop = Arc::new(AtomicBool::new(false));
+        let mut handles: Vec<thread::JoinHandle<()>> = Vec::with_capacity(chunks.len());
+        let char_vec: Vec<Vec<Vec<char>>> = Vec::new();
+        let ret_val = Arc::new(Mutex::new(char_vec));
+        for chunk in chunks.into_iter() {
+            let stop_t = stop.clone();
+            let mut new_letters = letters.clone();
+            let copied_new_valid_words_vec = valid_words_vec.clone();
+            let conn = ret_val.clone();
+            let handle = thread::spawn(move || {
+                for word in chunk.iter() {
+                    let mut board: Array2D<usize> = Array2D::filled_with(EMPTY_VALUE, BOARD_SIZE, BOARD_SIZE);
+                    let col_start = BOARD_SIZE/2 - word.len()/2;
+                    let row = BOARD_SIZE/2;
+                    for i in 0..word.len() {
+                        board[(row, col_start+i)] = word[i];
+                        new_letters[board[(row, col_start+i)]] -= 1;
+                    }
+                    let min_col = col_start;
+                    let min_row = row;
+                    let max_col = col_start + (word.len()-1);
+                    let max_row = row;
+                    let word_letters: HashSet<&usize> = HashSet::from_iter(word.iter());
+                    let new_valid_words_vec: Vec<Vec<usize>> = copied_new_valid_words_vec.iter().filter(|word| check_filter_after_play(new_letters, word, &word_letters)).map(|word| word.clone()).collect();
+                    let new_valid_words_set: HashSet<Vec<usize>> = HashSet::from_iter(new_valid_words_vec.clone());
+                    let result = play_further(&mut board, min_col, max_col, min_row, max_row, &new_valid_words_vec, &new_valid_words_set, letters, 0, &stop_t);
+                    match result {
+                        Ok(res) => {
+                            if res.0 {
+                                let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
+                                ret.push(board_to_vec(&board, res.1, res.2, res.3, res.4));
+                                stop_t.store(true, Ordering::Relaxed);
+                                break;
+                            }
+                        },
+                        Err(()) => {
                             break;
                         }
-                    },
-                    Err(()) => {
-                        break;
                     }
                 }
-            }
-        });
-        handles.push(handle);
-    }
-    for handle in handles.into_iter() {
-        let _res = handle.join();
-    }
-    let ret = ret_val.lock().expect("Failed to get lock on shared ret_val when checking return");
-    if ret.len() > 0 {
-        return Ok(ret[0].clone());
+            });
+            handles.push(handle);
+        }
+        for handle in handles.into_iter() {
+            let _res = handle.join();
+        }
+        let ret = ret_val.lock().expect("Failed to get lock on shared ret_val when checking return");
+        if ret.len() > 0 {
+            return Ok(ret[0].clone());
+        }
     }
     // Try again with all words
     let valid_words_vec: Vec<Vec<usize>> = state.all_words_long.iter().filter(|word| is_makeable(word, letters)).map(|word| word.clone()).collect();
-    let chunks: Vec<Vec<Vec<usize>>> = valid_words_vec.chunks(chunk_size.ceil() as usize).map(|words| words.to_vec()).collect();
-    let stop = Arc::new(AtomicBool::new(false));
-    let mut handles: Vec<thread::JoinHandle<()>> = Vec::with_capacity(chunks.len());
-    let char_vec: Vec<Vec<Vec<char>>> = Vec::new();
-    let ret_val = Arc::new(Mutex::new(char_vec));
-    for chunk in chunks.into_iter() {
-        let stop_t = stop.clone();
-        let mut new_letters = letters.clone();
-        let copied_new_valid_words_vec = valid_words_vec.clone();
-        let conn = ret_val.clone();
-        let handle = thread::spawn(move || {
-            for word in chunk.iter() {
-                let mut board: Array2D<usize> = Array2D::filled_with(EMPTY_VALUE, BOARD_SIZE, BOARD_SIZE);
-                let col_start = BOARD_SIZE/2 - word.len()/2;
-                let row = BOARD_SIZE/2;
-                for i in 0..word.len() {
-                    board[(row, col_start+i)] = word[i];
-                    new_letters[board[(row, col_start+i)]] -= 1;
-                }
-                let min_col = col_start;
-                let min_row = row;
-                let max_col = col_start + (word.len()-1);
-                let max_row = row;
-                let word_letters: HashSet<&usize> = HashSet::from_iter(word.iter());
-                let new_valid_words_vec: Vec<Vec<usize>> = copied_new_valid_words_vec.iter().filter(|word| check_filter_after_play(new_letters, word, &word_letters)).map(|word| word.clone()).collect();
-                let new_valid_words_set: HashSet<Vec<usize>> = HashSet::from_iter(new_valid_words_vec.clone());
-                let result = play_further(&mut board, min_col, max_col, min_row, max_row, &new_valid_words_vec, &new_valid_words_set, letters, 0, &stop_t);
-                match result {
-                    Ok(res) => {
-                        if res.0 {
-                            let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
-                            ret.push(board_to_vec(&board, res.1, res.2, res.3, res.4));
-                            stop_t.store(true, Ordering::Relaxed);
+    if valid_words_vec.len() > 0 {
+        let default_parallelism_approx = cmp::min(thread::available_parallelism().unwrap_or(NonZeroUsize::new(1).expect("Failed to create default NonZeroUsize")).get(), valid_words_vec.len());
+        let chunk_size = (valid_words_vec.len() as f32)/(default_parallelism_approx as f32);
+        let chunks: Vec<Vec<Vec<usize>>> = valid_words_vec.chunks(chunk_size.ceil() as usize).map(|words| words.to_vec()).collect();
+        let stop = Arc::new(AtomicBool::new(false));
+        let mut handles: Vec<thread::JoinHandle<()>> = Vec::with_capacity(chunks.len());
+        let char_vec: Vec<Vec<Vec<char>>> = Vec::new();
+        let ret_val = Arc::new(Mutex::new(char_vec));
+        for chunk in chunks.into_iter() {
+            let stop_t = stop.clone();
+            let mut new_letters = letters.clone();
+            let copied_new_valid_words_vec = valid_words_vec.clone();
+            let conn = ret_val.clone();
+            let handle = thread::spawn(move || {
+                for word in chunk.iter() {
+                    let mut board: Array2D<usize> = Array2D::filled_with(EMPTY_VALUE, BOARD_SIZE, BOARD_SIZE);
+                    let col_start = BOARD_SIZE/2 - word.len()/2;
+                    let row = BOARD_SIZE/2;
+                    for i in 0..word.len() {
+                        board[(row, col_start+i)] = word[i];
+                        new_letters[board[(row, col_start+i)]] -= 1;
+                    }
+                    let min_col = col_start;
+                    let min_row = row;
+                    let max_col = col_start + (word.len()-1);
+                    let max_row = row;
+                    let word_letters: HashSet<&usize> = HashSet::from_iter(word.iter());
+                    let new_valid_words_vec: Vec<Vec<usize>> = copied_new_valid_words_vec.iter().filter(|word| check_filter_after_play(new_letters, word, &word_letters)).map(|word| word.clone()).collect();
+                    let new_valid_words_set: HashSet<Vec<usize>> = HashSet::from_iter(new_valid_words_vec.clone());
+                    let result = play_further(&mut board, min_col, max_col, min_row, max_row, &new_valid_words_vec, &new_valid_words_set, letters, 0, &stop_t);
+                    match result {
+                        Ok(res) => {
+                            if res.0 {
+                                let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
+                                ret.push(board_to_vec(&board, res.1, res.2, res.3, res.4));
+                                stop_t.store(true, Ordering::Relaxed);
+                                break;
+                            }
+                        },
+                        Err(()) => {
                             break;
                         }
-                    },
-                    Err(()) => {
-                        break;
                     }
                 }
-            }
-        });
-        handles.push(handle);
-    }
-    for handle in handles.into_iter() {
-        let _res = handle.join();
-    }
-    let ret = ret_val.lock().expect("Failed to get lock on shared ret_val when checking return");
-    if ret.len() > 0 {
-        return Ok(ret[0].clone());
+            });
+            handles.push(handle);
+        }
+        for handle in handles.into_iter() {
+            let _res = handle.join();
+        }
+        let ret = ret_val.lock().expect("Failed to get lock on shared ret_val when checking return");
+        if ret.len() > 0 {
+            return Ok(ret[0].clone());
+        }
     }
     Err("No valid words - dump and try again!".to_owned())
 }
