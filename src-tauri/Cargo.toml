@@ -1,6 +1,6 @@
 [package]
 name = "bananagrams_solver"
-version = "0.0.0"
+version = "1.0.0"
 description = "A basic Bananagrams solver"
 authors = ["William Watson"]
 license = ""
@@ -16,12 +16,15 @@ tauri-build = { version = "1.4", features = [] }
 tauri = { version = "1.4", features = ["shell-open"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-array2d = "0.3.0"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
 
+[profile.dev]
+opt-level = 2
+
 [profile.release]
+opt-level = 3
 lto = true
