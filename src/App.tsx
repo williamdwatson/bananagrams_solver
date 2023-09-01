@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+import { sendNotification } from "@tauri-apps/api/notification";
+import React, { useState, useRef, useEffect, MouseEvent } from "react";
 import "primereact/resources/themes/tailwind-light/theme.css";
 import "primereact/resources/primereact.min.css";
 import 'primeicons/primeicons.css';
@@ -9,36 +10,74 @@ import "./App.css";
 import LetterInput from "./letter_input";
 import ResultsDisplay from "./results_display";
 
+/**
+ * The main parent component
+ * 
+ * @component
+ */
 function App() {
     const toast = useRef<Toast>(null);
     const [running, setRunning] = useState(false);
     const [results, setResults] = useState<string[][]>([]);
+    const [runTimeLetters, setRunTimeLetters] = useState<[number, Map<string, number>]>([0, new Map()]);
+    const [letterInputContextMenu, setLetterInputContextMenu] = useState<MouseEvent<HTMLDivElement>|null>(null);
+    const [resultsContextMenu, setResultsContextMenu] = useState<MouseEvent<HTMLDivElement>|null>(null);
 
-    /**
-     * Runs the solver
-     * @param letters A mapping of every character to the number of times it's present in the hand
-     */
-    const startRunning = (letters: Map<string, number>) => {
-        setRunning(true);
-        invoke("play_bananagrams", { availableLetters: letters })
+    // Disable right-clicking elsewhere on the page
+    useEffect(() => {
+        document.addEventListener("contextmenu", e => e.preventDefault())
+    }, []);
+
+    // Callback when runTimeLetters changes (since the hooks don't allow a callback)
+    useEffect(() => {
+        if (runTimeLetters[0] !== 0) {
+            invoke("play_bananagrams", { availableLetters: runTimeLetters[1] })
             .then(res => {
                 setResults(res as string[][]);
+                const t = new Date().getTime();
+                if (t - runTimeLetters[0] > 5000) {
+                    sendNotification({ title: "Completed", body: "The board has been solved!" });
+                }
             })
             .catch(error => {
                 toast.current?.show({severity: "error", summary: "Uh oh!", detail: "" + error});
             })
             .finally(() => setRunning(false));
-    }    
+        }
+    }, [runTimeLetters]);
+
+    /**
+     * Runs the solver
+     * @param letters Mapping of length-one letter strings to the number of that letter present in the hand
+     */
+    const startRunning = (letters: Map<string, number>) => {
+        setRunning(true);
+        setRunTimeLetters([new Date().getTime(), letters]);
+    }
+
+    /**
+     * Clears the existing results, if any (only if the solver is not currently running)
+     */
+    const clearResults = () => {
+        if (!running) {
+            invoke("reset").then(()=> {
+                setResults([]);
+            })
+            .catch(error => {
+                toast.current?.show({severity: "error", summary: "Uh oh!", detail: "" + error});
+            });
+        }
+    }
 
     return (
         <>
         <Toast ref={toast}/>
         <Splitter style={{height: "98vh"}}>
-            <SplitterPanel size={20}>
-                <LetterInput toast={toast} startRunning={startRunning} running={running}/>
+            <SplitterPanel size={20} pt={{root: {onContextMenu: e => setLetterInputContextMenu(e)}}}>
+                <LetterInput toast={toast} startRunning={startRunning} running={running} contextMenu={letterInputContextMenu}/>
             </SplitterPanel>
-            <SplitterPanel size={80} style={{display: "flex", justifyContent: "center", alignItems: "center"}}>
-                <ResultsDisplay results={results}/>
+            <SplitterPanel size={80} style={{display: "flex", justifyContent: "center", alignItems: "center"}} pt={{root: {onContextMenu: e => setResultsContextMenu(e)}}}>
+                <ResultsDisplay toast={toast} results={results} contextMenu={resultsContextMenu} clearResults={clearResults} running={running}/>
             </SplitterPanel>
         </Splitter>
         </>

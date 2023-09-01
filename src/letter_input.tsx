@@ -1,9 +1,13 @@
-import { useEffect, useState, RefObject } from "react";
+import React, { useEffect, useRef, useState, MouseEvent, RefObject } from "react";
 import { Button } from "primereact/button";
+import { confirmDialog } from "primereact/confirmdialog";
+import { ContextMenu } from "primereact/contextmenu";
 import { Dialog } from "primereact/dialog";
 import { InputNumber, InputNumberValueChangeEvent } from "primereact/inputnumber";
 import { InputText } from "primereact/inputtext";
+import { MenuItem } from "primereact/menuitem";
 import { Toast } from "primereact/toast";
+import { readText, writeText } from "@tauri-apps/api/clipboard";
 
 interface LetterInputProps {
     /**
@@ -18,36 +22,222 @@ interface LetterInputProps {
     /**
      * Whether the game is being solved or not
      */
-    running: boolean
+    running: boolean,
+    /**
+    * Mouse event for a right-click in the letter input SplitterPanel
+    */
+   contextMenu: MouseEvent<HTMLDivElement>|null,
 }
 
 /**
- * Displays the letter number inputs, along with the input dialog and buttons
- * 
- * @component
+ * Array of all uppercase Latin letters in alphabetical order
  */
-export default function LetterInput(props: LetterInputProps) {
-    const UPPERCASE_LETTERS = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
+const UPPERCASE = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
+
+/**
+ * The letter input boxes and dialog box, along with the solve button
+ * 
+ * @component 
+ */
+export default function LetterInput(props: LetterInputProps){
+    const cm = useRef<ContextMenu|null>(null);
     const m = new Map();
     const num_letters = new Map<string, number>();
     const invalid = new Map<string, boolean>();
     const how_many = [13, 3, 3, 6, 18, 3, 4, 3, 12, 2, 2, 5, 3, 8, 11, 3, 2, 9, 6, 9, 6, 3, 3, 2, 3, 2];
-    UPPERCASE_LETTERS.forEach((c, i) => {
+    const individual_cm_refs: RefObject<ContextMenu>[] = [];
+    const individual_cms: any[] = [];
+    UPPERCASE.forEach((c, i) => {
         m.set(c, 0);
         num_letters.set(c, how_many[i]);
         invalid.set(c, false);
+        const individual_cm = useRef<ContextMenu|null>(null);
+        individual_cm_refs.push(individual_cm);
+        const individual_items: MenuItem[] = [
+            { label: "Copy", icon: "pi pi-copy", command: () => writeText(String(letterNums.get(c)) ?? "0")},
+            { label: "Paste", icon: "pi pi-file-import", command: () => {
+                readText().then(val => {
+                    if (val != null && !isNaN(parseInt(val))) {
+                        const new_map = new Map(letterNums);
+                        new_map.set(c, parseInt(val));
+                        setLetterNums(new_map);
+                    }
+                });
+            }}
+        ]
+        individual_cms.push(<ContextMenu model={individual_items} ref={individual_cm} key={"cm-"+c}/>);
     });
     const [letterNums, setLetterNums] = useState<Map<string, number|null|undefined>>(m);
     const [lettersInvalid, setLettersInvalid] = useState<Map<string, boolean>>(invalid);
     const [typeInVisible, setTypeInVisible] = useState(false);
     const [typedIn, setTypedIn] = useState("");
 
-    // Focus the input (requires a timeout since the dialog auto-focuses the "X")
+    // Show the custom context menu on right click
+    useEffect(() => {
+        if (props.contextMenu != null) {
+            cm.current?.show(props.contextMenu);
+        }
+    }, [props.contextMenu]);
+
+    // Give focus to the text input (since there's an animation delay on it appearing, so not using a timeout doesn't always work)
     useEffect(() => {
         if (typeInVisible) {
             setTimeout(() => document.getElementById("typeIn")?.focus(), 100);
         }
     }, [typeInVisible]);
+
+    /**
+     * Copies the current hand of letters
+     * @param what Whether to copy in the same format as typing in the letters (`text`), as a `table` suitable for pasting into Excel, or as `json`
+     */
+    const copyLetters = (what: "text"|"table"|"json") => {
+        if (what === "text") {
+            let s = "";
+            UPPERCASE.forEach(letter => {
+                const num = letterNums.get(letter);
+                if (num != null) {
+                    for (let i=0; i<num; i++) {
+                        s += letter;
+                    }
+                }
+            });
+            writeText(s);
+        }
+        else if (what === "table") {
+            let s = "";
+            UPPERCASE.forEach((letter, i) => {
+                s += letter + "\t" + (letterNums.has(letter) ? letterNums.get(letter)! : "0");
+                if (i < UPPERCASE.length-1) {
+                    s += "\n";
+                }
+            });
+            writeText(s);
+        }
+        else {
+            const letters: Record<string, number> = {};
+            UPPERCASE.forEach(letter => {
+                if (!letterNums.has(letter)) {
+                    letters[letter] = 0;
+                }
+                else {
+                    letters[letter] = letterNums.get(letter)!;
+                }
+            });
+            const j = JSON.stringify(letters, undefined, 4);
+            writeText(j);
+        }
+    }
+
+    /**
+     * Tries to paste letters in different formats from the clipboard
+     */
+    const pasteLetters = () => {
+        readText().then(val => {
+            if (val != null) {
+                // First check if it's in the "Copy as text" format
+                const as_array = [...val].map(c => c.toUpperCase());
+                if (as_array.every(c => UPPERCASE.includes(c))) {
+                    const new_map = new Map<string, number>();
+                    UPPERCASE.forEach(c => {
+                        new_map.set(c, 0);
+                    });
+                    as_array.forEach(c => new_map.set(c, new_map.get(c)!+1));
+                    setLetterNums(new_map);
+                }
+                else {
+                    try {
+                        const parsed = JSON.parse(val);
+                        // Then check if it's a copied array
+                        if (Array.isArray(parsed) && parsed.length === UPPERCASE.length && parsed.every(num => !isNaN(parseInt(num)) && parseInt(num) >= 0)) {
+                            const new_map = new Map<string, number>();
+                            UPPERCASE.forEach((c, i) => {
+                                new_map.set(c, parseInt(parsed[i]));
+                            });
+                            setLetterNums(new_map);
+                        }
+                        // Then check if it's a copied JSON mapping (i.e. from "Copy as JSON")
+                        else if (UPPERCASE.every(c => (parsed.hasOwnProperty(c) && !isNaN(parseInt(parsed[c])) && parseInt(parsed[c]) >= 0) || (parsed.hasOwnProperty(c.toLowerCase()) && !isNaN(parseInt(parsed[c.toLowerCase()])) && parseInt(parsed[c.toLowerCase()]) >= 0))) {
+                            const new_map = new Map<string, number>();
+                            UPPERCASE.forEach(c => {
+                                let num = parsed.hasOwnProperty(c) && !isNaN(parseInt(parsed[c])) && parseInt(parsed[c]) >= 0 ? parseInt(parsed[c]) : parseInt(parsed[c.toLowerCase()]);
+                                new_map.set(c, num)
+                            });
+                            setLetterNums(new_map);
+                        }
+                        // I don't think this else can ever be hit, but leaving it anyways
+                        else {
+                            const lines = val.split(/\r\n|[\n\v\f\r\x85\u2028\u2029]/); // Split at new lines; see https://www.unicode.org/reports/tr18/#Line_Boundaries
+                            const new_map = new Map<string, number>();
+                            for (let i=0; i<lines.length; i++) {
+                                if (i >= UPPERCASE.length) {
+                                    break;
+                                }
+                                const vals = lines[i].split(/\t/);
+                                if (vals.length >= 2 && vals[0].toUpperCase() === UPPERCASE[i] && !isNaN(parseInt(vals[1])) && parseInt(vals[1]) >= 0) {
+                                    new_map.set(UPPERCASE[i], parseInt(vals[1]));
+                                }
+                                else {
+                                    break;
+                                }
+                            }
+                            if (new_map.size === UPPERCASE.length) {
+                                setLetterNums(new_map);
+                            }
+                        }
+                    }
+                    catch {
+                        // If JSON parsing fails, try assuming it's form "Copy as table"
+                        const lines = val.split(/\r\n|[\n\v\f\r\x85\u2028\u2029]/);
+                        const new_map = new Map<string, number>();
+                        for (let i=0; i<lines.length; i++) {
+                            if (i >= UPPERCASE.length) {
+                                break;
+                            }
+                            const vals = lines[i].split(/\t/);
+                            if (vals.length >= 2 && vals[0].toUpperCase() === UPPERCASE[i] && !isNaN(parseInt(vals[1])) && parseInt(vals[1]) >= 0) {
+                                new_map.set(UPPERCASE[i], parseInt(vals[1]));
+                            }
+                            else {
+                                break;
+                            }
+                        }
+                        if (new_map.size === UPPERCASE.length) {
+                            setLetterNums(new_map);
+                        }
+                    }
+                }
+            }
+        })
+    }
+
+    /**
+     * Resets the hand of letters after confirmation
+     */
+    const resetLetters = () => {
+        const empty_letters = new Map();
+        UPPERCASE.forEach(letter => {
+            empty_letters.set(letter, 0);
+        });
+        confirmDialog({
+            message: "Are you sure you want to reset the hand of letters?",
+            header: "Reset?",
+            icon: "pi pi-exclamation-triangle",
+            accept: () => setLetterNums(empty_letters)
+        });
+    }
+
+    /**
+     * Context menu items
+     */
+    const items: MenuItem[] = [
+        { label: "Copy as text", icon: "pi pi-copy", command: () => copyLetters("text") },
+        { label: "Copy as table", icon: "pi pi-file-excel", command: () => copyLetters("table")},
+        { label: "Copy as JSON", icon: "pi pi-list", command: () => copyLetters("json") },
+        { separator: true },
+        { label: "Paste", icon: "pi pi-file-import", command: pasteLetters },
+        { separator: true },
+        { label: "Reset", icon: "pi pi-eraser", command: resetLetters }
+    ];
 
     /**
      * Callback when a number is changed for a specified letter
@@ -81,7 +271,7 @@ export default function LetterInput(props: LetterInputProps) {
         let count = 0;
         for (let i=0; i < s.length; i++) {
             if (s[i] === letter) {
-                count += 1;
+                count++;
             }
         }
         return count;
@@ -92,7 +282,7 @@ export default function LetterInput(props: LetterInputProps) {
      */
     const useLetters = () => {
         const new_map = new Map<string, number>();
-        UPPERCASE_LETTERS.forEach(c => {
+        UPPERCASE.forEach(c => {
             new_map.set(c, count_letter_in_string(c, typedIn));
         });
         setLetterNums(new_map);
@@ -109,11 +299,11 @@ export default function LetterInput(props: LetterInputProps) {
             s += value ?? 0;
         }
         if (s < 2) {
-            props.toast.current?.show({"severity": "warn", "summary": "Not enought letters", "detail": "More than one letter must be present."})
+            props.toast.current?.show({"severity": "warn", "summary": "Not enough letters", "detail": "More than one letter must be present."})
         }
         else {
             const letters = new Map<string, number>();
-            UPPERCASE_LETTERS.forEach(c => {
+            UPPERCASE.forEach(c => {
                 letters.set(c, letterNums.get(c) ?? 0);
             });
             props.startRunning(letters);
@@ -122,19 +312,27 @@ export default function LetterInput(props: LetterInputProps) {
     
     return (
         <>
+        <ContextMenu model={items} ref={cm}/>
+        {[...individual_cms]}
+        {/* <ContextMenu model={individual_items} ref={individual_cm}/> */}
         <Dialog header="Type in letters" visible={typeInVisible} onHide={() => setTypeInVisible(false)}>
-            <InputText value={typedIn} onChange={e => setTypedIn(e.target.value.toUpperCase())} keyfilter="alpha" id="typeIn"/>
-            <br/>
-            <Button label="Use letters" style={{marginTop: "5px", marginRight: "5px"}} onClick={useLetters}/>
-            <Button label="Cancel" severity="secondary" onClick={() => {setTypedIn(""); setTypeInVisible(false)}}/>
+            <form onSubmit={e => {e.preventDefault(); useLetters()}} autoComplete="off">
+                <InputText value={typedIn} onChange={e => setTypedIn(e.target.value.toUpperCase())} keyfilter="alpha" id="typeIn"/>
+                <br/>
+                <Button type="submit" label="Use letters" style={{marginTop: "5px", marginRight: "5px"}}/>
+                <Button type="reset" label="Cancel" severity="secondary" onClick={() => {setTypedIn(""); setTypeInVisible(false)}}/>
+            </form>
         </Dialog>
-        {UPPERCASE_LETTERS.map(c => {
-            return <span style={{marginLeft: "5px", display: "inline-block"}} key={"span-"+c}><label htmlFor={"char-"+c} style={{display: "inline-block", minWidth: "20px"}}>{c}:</label>
-            <InputNumber inputId={"char-"+c} value={letterNums.get(c)} onValueChange={e => changeLetterNum(c, e)} min={0} size={1} showButtons inputStyle={{padding: "5px", width: "3rem"}} incrementButtonClassName="input-button-type" decrementButtonClassName="input-button-type" className={lettersInvalid.get(c) ? "p-invalid" : undefined} style={{marginTop: "5px", paddingLeft: "5px"}}/></span>
+        {UPPERCASE.map((c, i) => {
+            return (
+                <span style={{marginLeft: "5px", display: "inline-block"}} key={"span-"+c}><label htmlFor={"char-"+c} style={{display: "inline-block", minWidth: "20px"}}>{c}:</label>
+                    <InputNumber inputId={"char-"+c} value={letterNums.get(c)} onValueChange={e => changeLetterNum(c, e)} min={0} size={1} showButtons inputStyle={{padding: "5px", width: "3rem"}} incrementButtonClassName="input-button-type" decrementButtonClassName="input-button-type" className={lettersInvalid.get(c) ? "p-invalid" : undefined} style={{marginTop: "5px", paddingLeft: "5px"}} onContextMenu={e => individual_cm_refs[i].current?.show(e)}/>
+                </span>
+            )
         })}
         <br/>
-        <Button label="Type in letters" style={{padding: "8px", marginTop: "5px", marginLeft: "15px", marginRight: "15px"}} onClick={() => setTypeInVisible(true)}/>
-        <Button label="Solve" icon="pi pi-arrow-right" iconPos="right" style={{padding: "8px"}} severity="success" onClick={solve} loading={props.running}/>
+        <Button type="button" label="Type in letters" style={{padding: "8px", marginTop: "5px", marginLeft: "15px", marginRight: "15px"}} onClick={() => setTypeInVisible(true)}/>
+        <Button type="button" label="Solve" icon="pi pi-arrow-right" iconPos="right" style={{padding: "8px"}} severity="success" onClick={solve} loading={props.running}/>
         </>
     )
 }
