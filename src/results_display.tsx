@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, MouseEvent, RefObject } from "react";
+import { useEffect, useRef, MouseEvent, RefObject } from "react";
 import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import { ContextMenu } from "primereact/contextmenu";
 import { MenuItem } from "primereact/menuitem";
@@ -30,9 +30,9 @@ interface ResultsDisplayProps {
 }
 
 /**
- * The results board
+ * Displays the solution
  * 
- * @component 
+ * @component
  */
 export default function ResultsDisplay(props: ResultsDisplayProps) {
     const cm = useRef<ContextMenu|null>(null);
@@ -126,10 +126,10 @@ export default function ResultsDisplay(props: ResultsDisplayProps) {
         <ContextMenu model={items} ref={cm}/>
         {props.results.length === 0 ? null :
         <table id="results-table">
-            <tbody>
+            <tbody className="results-tbody">
                 {props.results.map((row, i) => {
                     return (
-                        <tr key={"row-"+i}>
+                        <tr key={"row-"+i} className="results-tr">
                             {row.map((val, j) => {
                                 if (val.trim() === "") {
                                     return <td key={"row-"+i+"-cell-"+j} className="emptyCell"></td>

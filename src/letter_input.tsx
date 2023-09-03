@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, MouseEvent, RefObject } from "react";
+import { useEffect, useRef, useState, MouseEvent, RefObject } from "react";
 import { Button } from "primereact/button";
 import { confirmDialog } from "primereact/confirmdialog";
 import { ContextMenu } from "primereact/contextmenu";
@@ -8,6 +8,8 @@ import { InputText } from "primereact/inputtext";
 import { MenuItem } from "primereact/menuitem";
 import { Toast } from "primereact/toast";
 import { readText, writeText } from "@tauri-apps/api/clipboard";
+import { invoke } from "@tauri-apps/api/tauri";
+import { Dropdown } from "primereact/dropdown";
 
 interface LetterInputProps {
     /**
@@ -27,6 +29,20 @@ interface LetterInputProps {
     * Mouse event for a right-click in the letter input SplitterPanel
     */
    contextMenu: MouseEvent<HTMLDivElement>|null,
+   /**
+    * Sets the list of words that can be played given the tiles in the hand
+    * @param words Which words can be played
+    */
+   setPlayableWords: (words: {short: string[], long: string[]}) => void,
+   /**
+    * Sets whether the visible words popup should be visible
+    * @param visible Whether the popup should be visible
+    */
+   setPlayableWordsVisible: (visible: boolean) => void,
+    /**
+     * Function to clear the board's results
+     */
+   clearResults: () => void
 }
 
 /**
@@ -35,9 +51,9 @@ interface LetterInputProps {
 const UPPERCASE = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
 
 /**
- * The letter input boxes and dialog box, along with the solve button
+ * For inputting a hand of letters and starting a solve
  * 
- * @component 
+ * @component
  */
 export default function LetterInput(props: LetterInputProps){
     const cm = useRef<ContextMenu|null>(null);
@@ -71,6 +87,7 @@ export default function LetterInput(props: LetterInputProps){
     const [lettersInvalid, setLettersInvalid] = useState<Map<string, boolean>>(invalid);
     const [typeInVisible, setTypeInVisible] = useState(false);
     const [typedIn, setTypedIn] = useState("");
+    const [playableWordsLoading, setPlayableWordsLoading] = useState(false);   
 
     // Show the custom context menu on right click
     useEffect(() => {
@@ -214,16 +231,18 @@ export default function LetterInput(props: LetterInputProps){
      * Resets the hand of letters after confirmation
      */
     const resetLetters = () => {
-        const empty_letters = new Map();
-        UPPERCASE.forEach(letter => {
-            empty_letters.set(letter, 0);
-        });
-        confirmDialog({
-            message: "Are you sure you want to reset the hand of letters?",
-            header: "Reset?",
-            icon: "pi pi-exclamation-triangle",
-            accept: () => setLetterNums(empty_letters)
-        });
+        if (Array.from(letterNums.values()).some(val => val! > 0)) {
+            const empty_letters = new Map();
+            UPPERCASE.forEach(letter => {
+                empty_letters.set(letter, 0);
+            });
+            confirmDialog({
+                message: "Are you sure you want to reset the hand of letters?",
+                header: "Reset?",
+                icon: "pi pi-exclamation-triangle",
+                accept: () => setLetterNums(empty_letters)
+            });
+        }
     }
 
     /**
@@ -291,6 +310,47 @@ export default function LetterInput(props: LetterInputProps){
     }
 
     /**
+     * Attempts to display words makeable with the hand of letters
+     */
+    const viewPlayableWords = () => {
+        let s = 0;
+        for (const value of letterNums.values()) {
+            s += value ?? 0;
+        }
+        if (s < 2) {
+            props.toast.current?.show({"severity": "warn", "summary": "Not enough letters", "detail": "More than one letter must be present."})
+        }
+        else {
+            setPlayableWordsLoading(true);
+            const letters = new Map<string, number>();
+            UPPERCASE.forEach(c => {
+                letters.set(c, letterNums.get(c) ?? 0);
+            });
+            invoke("get_playable_words", { availableLetters: letters }).then(res => {
+                const result = res as {short: string[], long: string[]};
+                props.setPlayableWords(result);
+                props.setPlayableWordsVisible(true);
+            })
+            .catch(error => props.toast.current?.show({"severity": "warn", "summary": "An error occurred", "detail": "An error occurred getting the playable words: " + error}))
+            .finally(() => setPlayableWordsLoading(false));
+        }
+    }
+
+    const doReset = (which: "Reset hand"|"Reset board") => {
+        if (which === "Reset hand") {
+            resetLetters();
+        }
+        else {
+            confirmDialog({
+                message: "Are you sure you want to reset the board?",
+                header: "Reset?",
+                icon: "pi pi-exclamation-triangle",
+                accept: props.clearResults
+            });
+        }
+    }
+
+    /**
      * Callback to start solving the puzzle
      */
     const solve = () => {
@@ -323,16 +383,24 @@ export default function LetterInput(props: LetterInputProps){
                 <Button type="reset" label="Cancel" severity="secondary" onClick={() => {setTypedIn(""); setTypeInVisible(false)}}/>
             </form>
         </Dialog>
-        {UPPERCASE.map((c, i) => {
-            return (
-                <span style={{marginLeft: "5px", display: "inline-block"}} key={"span-"+c}><label htmlFor={"char-"+c} style={{display: "inline-block", minWidth: "20px"}}>{c}:</label>
-                    <InputNumber inputId={"char-"+c} value={letterNums.get(c)} onValueChange={e => changeLetterNum(c, e)} min={0} size={1} showButtons inputStyle={{padding: "5px", width: "3rem"}} incrementButtonClassName="input-button-type" decrementButtonClassName="input-button-type" className={lettersInvalid.get(c) ? "p-invalid" : undefined} style={{marginTop: "5px", paddingLeft: "5px"}} onContextMenu={e => individual_cm_refs[i].current?.show(e)}/>
-                </span>
-            )
-        })}
+        <div>
+            {UPPERCASE.map((c, i) => {
+                return (
+                    <span className="letter-input-span" key={"span-"+c}><label htmlFor={"char-"+c} className="letter-input-label">{c}:</label>
+                        <InputNumber inputId={"char-"+c} value={letterNums.get(c)} onValueChange={e => changeLetterNum(c, e)} min={0} size={1} showButtons inputStyle={{padding: "5px", width: "3rem"}} incrementButtonClassName="input-button-type" decrementButtonClassName="input-button-type" className={lettersInvalid.get(c) ? "p-invalid" : undefined} style={{marginTop: "5px", paddingLeft: "5px"}} onContextMenu={e => individual_cm_refs[i].current?.show(e)}/>
+                    </span>
+                )
+            })}
+        </div>
         <br/>
-        <Button type="button" label="Type in letters" style={{padding: "8px", marginTop: "5px", marginLeft: "15px", marginRight: "15px"}} onClick={() => setTypeInVisible(true)}/>
-        <Button type="button" label="Solve" icon="pi pi-arrow-right" iconPos="right" style={{padding: "8px"}} severity="success" onClick={solve} loading={props.running}/>
+        <div className="button-div">
+            <Button type="button" label="Type in letters" style={{padding: "8px", marginTop: "5px", marginRight: "2%"}} onClick={() => setTypeInVisible(true)}/>
+            <Button type="button" label="View playable words" icon="pi pi-book" iconPos="right" style={{padding: "8px", marginTop: "5px"}} onClick={viewPlayableWords} loading={playableWordsLoading}/>
+        </div>
+        <div className="button-div">
+            <Dropdown placeholder="Reset" options={["Reset hand", "Reset board"]} style={{marginTop: "5px", marginRight: "2%"}} onChange={e => doReset(e.value)} className="reset-dropdown" panelClassName="reset-dropdown" pt={{input: {style: {color: "white"}}, item: {className: "reset-dropdown-item"}, trigger: {style: {color: "white"}}}}/>
+            <Button type="button" label="Solve" icon="pi pi-arrow-right" iconPos="right" style={{marginTop: "5px"}} severity="success" onClick={solve} loading={props.running}/>
+        </div>
         </>
     )
 }

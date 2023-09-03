@@ -1,5 +1,5 @@
 import { sendNotification } from "@tauri-apps/api/notification";
-import React, { useState, useRef, useEffect, MouseEvent } from "react";
+import { useState, useRef, useEffect, MouseEvent } from "react";
 import "primereact/resources/themes/tailwind-light/theme.css";
 import "primereact/resources/primereact.min.css";
 import 'primeicons/primeicons.css';
@@ -9,12 +9,8 @@ import { invoke } from "@tauri-apps/api/tauri";
 import "./App.css";
 import LetterInput from "./letter_input";
 import ResultsDisplay from "./results_display";
+import PlayableWords from "./playable_words";
 
-/**
- * The main parent component
- * 
- * @component
- */
 function App() {
     const toast = useRef<Toast>(null);
     const [running, setRunning] = useState(false);
@@ -22,11 +18,13 @@ function App() {
     const [runTimeLetters, setRunTimeLetters] = useState<[number, Map<string, number>]>([0, new Map()]);
     const [letterInputContextMenu, setLetterInputContextMenu] = useState<MouseEvent<HTMLDivElement>|null>(null);
     const [resultsContextMenu, setResultsContextMenu] = useState<MouseEvent<HTMLDivElement>|null>(null);
+    const [playableWordsVisible, setPlayableWordsVisible] = useState(false);
+    const [playableWords, setPlayableWords] = useState<{short: string[], long: string[]}|null>(null);
 
     // Disable right-clicking elsewhere on the page
-    useEffect(() => {
-        document.addEventListener("contextmenu", e => e.preventDefault())
-    }, []);
+    // useEffect(() => {
+    //     document.addEventListener("contextmenu", e => e.preventDefault())
+    // }, []);
 
     // Callback when runTimeLetters changes (since the hooks don't allow a callback)
     useEffect(() => {
@@ -72,9 +70,10 @@ function App() {
     return (
         <>
         <Toast ref={toast}/>
+        <PlayableWords playableWords={playableWords} visible={playableWordsVisible} setVisible={setPlayableWordsVisible}/>
         <Splitter style={{height: "98vh"}}>
             <SplitterPanel size={20} pt={{root: {onContextMenu: e => setLetterInputContextMenu(e)}}}>
-                <LetterInput toast={toast} startRunning={startRunning} running={running} contextMenu={letterInputContextMenu}/>
+                <LetterInput toast={toast} startRunning={startRunning} running={running} contextMenu={letterInputContextMenu} setPlayableWords={setPlayableWords} setPlayableWordsVisible={setPlayableWordsVisible} clearResults={clearResults}/>
             </SplitterPanel>
             <SplitterPanel size={80} style={{display: "flex", justifyContent: "center", alignItems: "center"}} pt={{root: {onContextMenu: e => setResultsContextMenu(e)}}}>
                 <ResultsDisplay toast={toast} results={results} contextMenu={resultsContextMenu} clearResults={clearResults} running={running}/>

@@ -2,12 +2,12 @@ body {
   font-family: sans-serif;
 }
 
-tbody {
+.results-tbody {
   align-items: center;
   display: inline-block;
 }
 
-tr {
+.results-tr {
   height: 1rem;
 }
 
@@ -27,4 +27,43 @@ tr {
 
 .input-button-type {
   width: 1rem !important;
+}
+
+.playable-word-sort-filter {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.playable-word-statistic {
+  font-weight: bold;
+  margin-left: 5px;
+}
+
+.letter-input-span {
+  display: inline-block;
+  margin-left: 5px;
+}
+.letter-input-label {
+  display: inline-block;
+  min-width: 2ch;
+}
+
+.button-div {
+  display: flex;
+  justify-content: center;
+  margin-left: 15px;
+  margin-right: 15px;
+}
+
+.reset-dropdown {
+  background-color: rgb(239, 68, 68);
+  color: white;
+}
+.reset-dropdown-item {
+  color: white !important;
+}
+.reset-dropdown-item:hover {
+  background-color: rgb(218, 66, 66) !important;
+  color: white !important;
 }

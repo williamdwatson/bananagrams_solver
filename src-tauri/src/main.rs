@@ -5,6 +5,7 @@ use std::{cmp, fmt, mem, thread, usize, collections::HashMap, collections::HashS
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::State;
+use serde::Serialize;
 
 /// A numeric representation of a word
 type Word = Vec<usize>;
@@ -70,9 +71,9 @@ fn convert_word_to_array(word: &str) -> Word {
 /// * `String` - `arr` converted into a `String`, with each number converted from 'A' (0) to 'Z' (25)
 /// # See also
 /// `convert_word_to_array`
-// fn convert_array_to_word(arr: &Word) -> String {
-//     arr.iter().map(|c| (*c as u8+65) as char).collect()
-// }
+fn convert_array_to_word(arr: &Word) -> String {
+    arr.iter().map(|c| (*c as u8+65) as char).collect()
+}
 
 /// Converts a `board` to a `String`
 /// # Arguments
@@ -780,6 +781,15 @@ enum LetterComparison {
     Same
 }
 
+/// Struct returned when getting playable words
+#[derive(Serialize)]
+struct PlayableWords {
+    /// Playable words using the shorter dictionary
+    short: Vec<String>,
+    /// Playable words using the whole Scrabble dictionary
+    long: Vec<String>
+}
+
 /// The previous game state
 struct GameState {
     /// The previous board
@@ -808,11 +818,42 @@ struct AppState {
     last_game: Mutex<Option<GameState>>
 }
 
+/// Async command executed by the frontend to get the playable words for a given hand of letters
+/// # Arguments
+/// * `available_letters` - `HashMap` (from JavaScript object) mapping string letters to numeric quanity of each letter
+/// * `state` - Current state of the app
+/// # Returns
+/// `Result` of `PlayableWords` with two keys - "short" (common words playable using `available_letters`) and "long" (Scrabble words playable using `available_letters`)
+/// 
+/// *or String `Err` upon failure*
+#[tauri::command]
+async fn get_playable_words(available_letters: HashMap<String, i64>, state: State<'_, AppState>) -> Result<PlayableWords, String> {
+    // Check if we have all the letters from the frontend
+    let mut letters = [0usize; 26];
+    for c in UPPERCASE.chars() {
+        let num = available_letters.get(&c.to_string());
+        match num {
+            Some(number) => {
+                if *number < 0 {
+                    return Err(format!("Number of letter {} is {}, but must be greater than or equal to 0!", c, number));
+                }
+                letters[(c as usize) - 65] = *number as usize;
+            },
+            None => {
+                return Err(format!("Missing letter: {}", c));
+            }
+        }
+    }
+    let playable_short: Vec<String> = state.all_words_short.iter().filter(|word| is_makeable(word, letters)).map(|word| convert_array_to_word(word)).collect();
+    let playable_long: Vec<String> = state.all_words_long.iter().filter(|word| is_makeable(word, letters)).map(|word| convert_array_to_word(word)).collect();
+    return Ok(PlayableWords { short: playable_short, long: playable_long })
+}
+
 /// Async command executed by the frontend to reset the Banangrams board
 /// # Arguments
 /// * `state` - Current state of the app
 /// # Returns
-/// Empty result upon success
+/// Empty `Result` upon success
 /// 
 /// *or empty `Err` if out-of-bounds*
 #[tauri::command]
@@ -824,7 +865,7 @@ async fn reset(state: State<'_, AppState>) -> Result<(), String> {
 
 /// Async command executed by the frontend to solve a Bananagrams board
 /// # Arguments
-/// * `available_letters` - `HashMap` (from JavaScript object) mapping string letters to numeric quanity of each letters
+/// * `available_letters` - `HashMap` (from JavaScript object) mapping string letters to numeric quanity of each letter
 /// * `state` - Current state of the app
 /// # Returns
 /// `Result` with vector of vector of chars of the solution
@@ -1092,7 +1133,7 @@ fn main() {
     let all_words_long: Vec<Word> = include_str!("dictionary.txt").lines().map(convert_word_to_array).collect();
     tauri::Builder::default()
         .manage(AppState { all_words_short, all_words_long, last_game: None.into() })
-        .invoke_handler(tauri::generate_handler![play_bananagrams, reset])
+        .invoke_handler(tauri::generate_handler![play_bananagrams, reset, get_playable_words])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
