@@ -72,10 +72,10 @@ function App() {
         <Toast ref={toast}/>
         <PlayableWords playableWords={playableWords} visible={playableWordsVisible} setVisible={setPlayableWordsVisible}/>
         <Splitter style={{height: "98vh"}}>
-            <SplitterPanel size={20} pt={{root: {onContextMenu: e => setLetterInputContextMenu(e)}}}>
+            <SplitterPanel size={25} pt={{root: {onContextMenu: e => setLetterInputContextMenu(e)}}}>
                 <LetterInput toast={toast} startRunning={startRunning} running={running} contextMenu={letterInputContextMenu} setPlayableWords={setPlayableWords} setPlayableWordsVisible={setPlayableWordsVisible} clearResults={clearResults}/>
             </SplitterPanel>
-            <SplitterPanel size={80} style={{display: "flex", justifyContent: "center", alignItems: "center"}} pt={{root: {onContextMenu: e => setResultsContextMenu(e)}}}>
+            <SplitterPanel size={75} style={{display: "flex", justifyContent: "center", alignItems: "center"}} pt={{root: {onContextMenu: e => setResultsContextMenu(e)}}}>
                 <ResultsDisplay toast={toast} results={results} contextMenu={resultsContextMenu} clearResults={clearResults} running={running}/>
             </SplitterPanel>
         </Splitter>

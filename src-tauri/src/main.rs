@@ -4,8 +4,10 @@
 use std::{cmp, fmt, mem, thread, usize, collections::HashMap, collections::HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use tauri::State;
+use rand::prelude::*;
+use rand::distributions::Uniform;
 use serde::Serialize;
+use tauri::State;
 
 /// A numeric representation of a word
 type Word = Vec<usize>;
@@ -19,9 +21,11 @@ const MAX_WORD_LENGTH: usize = 15;
 /// Value of an empty cell on the board
 const EMPTY_VALUE: usize = 30;
 /// Number rows/columns in the board
-const BOARD_SIZE: usize = 128;
+const BOARD_SIZE: usize = 144;
 /// All uppercase letters in the Latin alphabet
 const UPPERCASE: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+/// The number of each letter present in regular Bananagrams
+const REGULAR_TILES: [u64; 26] = [13, 3, 3, 6, 18, 3, 4, 3, 12, 2, 2, 5, 3, 8, 11, 3, 2, 9, 6, 9, 6, 3, 3, 2, 3, 2];
 
 /// A thin wrapper for handling the board
 #[derive(Clone)]
@@ -157,54 +161,96 @@ fn is_makeable(word: &Word, letters: Letters) -> bool {
 /// * `start_col` - Starting column of the word played
 /// * `end_col` - Ending column of the word played
 /// * `valid_words` - HashSet of all valid words as `Vec<usize>`s
+/// * `valid_words_backwards` - HashSet of all reversed valid words as `Vec<usize>`s
 /// # Returns
 /// `bool` - whether the given `board` is made only of valid words
-fn is_board_valid_horizontal(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, row: usize, start_col: usize, end_col: usize, valid_words: &HashSet<Word>) -> bool {
+fn is_board_valid_horizontal(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, row: usize, start_col: usize, end_col: usize, valid_words: &HashSet<Word>, valid_words_backwards: &HashSet<Word>) -> bool {
     let mut current_letters: Vec<usize> = Vec::with_capacity(MAX_WORD_LENGTH);
-    for col_idx in min_col..max_col+1 {
+    // Check forward across the row where the word was played
+    for col_idx in start_col..max_col+1 {
+        // If we're not at an empty square, add it to the current word we're looking at
         if board.get_val(row, col_idx) != EMPTY_VALUE {
             current_letters.push(board.get_val(row, col_idx));
         }
-        else if current_letters.len() > 1 {
-            if valid_words.contains(&current_letters) {
-                current_letters.clear();
-            }
-            else {
-                return false;
-            }
-        }
-        else if current_letters.len() == 1 {
-            current_letters.clear();
-        }
-    }
-    if current_letters.len() > 1 {
-        if valid_words.contains(&current_letters) {
-            current_letters.clear();
-        }
         else {
-            return false;
-        }
-    }
-    for col_idx in start_col..end_col+1 {
-        current_letters.clear();
-        for row_idx in min_row..max_row+1 {
-            if board.get_val(row_idx, col_idx) != EMPTY_VALUE {
-                current_letters.push(board.get_val(row_idx, col_idx));
-            }
-            else if current_letters.len() > 1 {
-                if valid_words.contains(&current_letters) {
-                    current_letters.clear();
-                }
-                else {
+            // If we're at an empty square, we can stop checking
+            if current_letters.len() > 1 {
+                if !valid_words.contains(&current_letters) {
                     return false;
                 }
             }
-            else if current_letters.len() == 1 {
-                current_letters.clear();
+            break;
+        }
+    }
+    if current_letters.len() > 1 {
+        if !valid_words.contains(&current_letters) {
+            return false;
+        }
+    }
+    current_letters.clear();
+    // Check backwards across the row where the word was played
+    let mut j = end_col;
+    while j >= min_col {
+        if board.get_val(row, j) != EMPTY_VALUE {
+            current_letters.push(board.get_val(row, j));
+        }
+        else {
+            // If we're at an empty square, we can stop checking
+            if current_letters.len() > 1 {
+                if !valid_words_backwards.contains(&current_letters) {
+                    return false;
+                }
+            }
+            break;
+        }
+        j -= 1;
+    }
+    if current_letters.len() > 1 {
+        if !valid_words_backwards.contains(&current_letters) {
+            return false;
+        }
+    }
+    current_letters.clear();
+    // Check backwards and forwards down each column where a letter was played
+    for col_idx in start_col..end_col+1 {
+        // Check forwards
+        for row_idx in row..max_row+1 {
+            if board.get_val(row_idx, col_idx) != EMPTY_VALUE {
+                current_letters.push(board.get_val(row_idx, col_idx));
+            }
+            else {
+                if current_letters.len() > 1 {
+                    if !valid_words.contains(&current_letters) {
+                        return false;
+                    }
+                }
+                break;
             }
         }
         if current_letters.len() > 1 {
             if !valid_words.contains(&current_letters) {
+                return false;
+            }
+        }
+        current_letters.clear();
+        // Check backwards
+        j = row;
+        while j >= min_row {
+            if board.get_val(j, col_idx) != EMPTY_VALUE {
+                current_letters.push(board.get_val(j, col_idx));
+            }
+            else {
+                if current_letters.len() > 1 {
+                    if !valid_words_backwards.contains(&current_letters) {
+                        return false;
+                    }
+                }
+                break;
+            }
+            j -= 1;
+        }
+        if current_letters.len() > 1 {
+            if !valid_words_backwards.contains(&current_letters) {
                 return false;
             }
         }
@@ -224,57 +270,95 @@ fn is_board_valid_horizontal(board: &Board, min_col: usize, max_col: usize, min_
 /// * `end_row` - Ending row of the word played
 /// * `col` - Column of the word played
 /// * `valid_words` - HashSet of all valid words as `Vec<usize>`s
+/// * `valid_words_backwards` - HashSet of all reversed valid words as `Vec<usize>`s
 /// # Returns
 /// `bool` - whether the given `board` is made only of valid words
-fn is_board_valid_vertical(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, start_row: usize, end_row: usize, col: usize, valid_words: &HashSet<Word>) -> bool {
+fn is_board_valid_vertical(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, start_row: usize, end_row: usize, col: usize, valid_words: &HashSet<Word>, valid_words_backwards: &HashSet<Word>) -> bool {
     let mut current_letters: Vec<usize> = Vec::with_capacity(MAX_WORD_LENGTH);
-    for row_idx in start_row..end_row+1 {
-        current_letters.clear();
-        for col_idx in min_col..max_col+1 {
-            if board.get_val(row_idx, col_idx) != EMPTY_VALUE {
-                current_letters.push(board.get_val(row_idx, col_idx));
-            }
-            else if current_letters.len() > 1 {
-                if valid_words.contains(&current_letters) {
-                    current_letters.clear();
-                }
-                else {
-                    return false;
-                }
-            }
-            else if current_letters.len() == 1 {
-                current_letters.clear();
-            }
-        }
-        if current_letters.len() > 1 {
-            if valid_words.contains(&current_letters) {
-                current_letters.clear();
-            }
-            else {
-                return false;
-            }
-        }
-    }
-    current_letters.clear();
-    for row_idx in min_row..max_row+1 {
+    // Check forwards from where the word was played
+    for row_idx in start_row..max_row+1 {
         if board.get_val(row_idx, col) != EMPTY_VALUE {
             current_letters.push(board.get_val(row_idx, col));
         }
-        else if current_letters.len() > 1 {
-            if valid_words.contains(&current_letters) {
-                current_letters.clear();
+        else {
+            if current_letters.len() > 1 {
+                if !valid_words.contains(&current_letters) {
+                    return false;
+                }
             }
-            else {
-                return false;
-            }
-        }
-        else if current_letters.len() == 1 {
-            current_letters.clear();
+            break;
         }
     }
     if current_letters.len() > 1 {
         if !valid_words.contains(&current_letters) {
             return false;
+        }
+    }
+    current_letters.clear();
+    // Check backwards from where the word was played
+    let mut j = end_row;
+    while j >= min_row {
+        if board.get_val(j, col) != EMPTY_VALUE {
+            current_letters.push(board.get_val(j, col));
+        }
+        else {
+            if current_letters.len() > 1 {
+                if !valid_words_backwards.contains(&current_letters) {
+                    return false;
+                }
+            }
+            break;
+        }
+        j -= 1;
+    }
+    if current_letters.len() > 1 {
+        if !valid_words_backwards.contains(&current_letters) {
+            return false;
+        }
+    }
+    current_letters.clear();
+    // Check backwards and forwards across each row where a letter was played
+    for row_idx in start_row..end_row+1 {
+        // Check forwards
+        for col_idx in col..max_col+1 {
+            if board.get_val(row_idx, col_idx) != EMPTY_VALUE {
+                current_letters.push(board.get_val(row_idx, col_idx));
+            }
+            else {
+                if current_letters.len() > 1 {
+                    if !valid_words.contains(&current_letters) {
+                        return false;
+                    }
+                }
+                break;
+            }
+        }
+        if current_letters.len() > 1 {
+            if !valid_words.contains(&current_letters) {
+                return false;
+            }
+        }
+        current_letters.clear();
+        // Check backwards
+        j = col;
+        while j >= min_col {
+            if board.get_val(row_idx, j) != EMPTY_VALUE {
+                current_letters.push(board.get_val(row_idx, j));
+            }
+            else {
+                if current_letters.len() > 1 {
+                    if !valid_words_backwards.contains(&current_letters) {
+                        return false;
+                    }
+                }
+                break;
+            }
+            j -= 1;
+        }
+        if current_letters.len() > 1 {
+            if !valid_words_backwards.contains(&current_letters) {
+                return false;
+            }
         }
     }
     return true;
@@ -463,19 +547,20 @@ fn check_filter_after_play(letters: Letters, word_being_checked: &Word, previous
 /// * `max_row` - Maximum occupied row index in `board`
 /// * `valid_words_vec` - Vector of vectors, each representing a word (see `convert_word_to_array`)
 /// * `valid_words_set` - HashSet of vectors, each representing a word (a HashSet version of `valid_words_vec` for faster membership checking)
+/// * `valid_words_backwards` - HashSet of all reversed valid words as `Vec<usize>`s
 /// * `letters` - Length-26 array of the number of each letter in the hand
 /// * `depth` - Depth of the current recursive call
 /// * `stop_me` - Shared `AtomicBool` used to indicate when early stopping should occur
 /// # Returns
 /// *`Result` with:*
 /// * `bool` - Whether the word could be validly played
-/// * `usize` - The minimum occupied column index in `board`
+/// * `usize` - Minimum occupied column index in `board`
 /// * `usize` - Maximum occupied column index in `board`
 /// * `usize` - Minimum occupied row index in `board`
 /// * `usize` - Maximum occupied row index in `board`
 /// 
 /// *or empty `Err` on if out-of-bounds*
-fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, valid_words_vec: &Vec<Word>, valid_words_set: &HashSet<Word>, letters: Letters, depth: usize, play_sequence: &mut PlaySequence, previous_play_sequence: &PlaySequence, stop_me: &Arc<AtomicBool>) -> Result<(bool, usize, usize, usize, usize), ()> {
+fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, valid_words_vec: &Vec<Word>, valid_words_set: &HashSet<Word>, valid_words_backwards_set: &HashSet<Word>, letters: Letters, depth: usize, play_sequence: &mut PlaySequence, previous_play_sequence: &PlaySequence, stop_me: &Arc<AtomicBool>) -> Result<(bool, usize, usize, usize, usize), ()> {
     match check_letter_usage(&board, min_col, max_col, min_row, max_row, letters) {
         LetterUsage::Overused => Ok((false, min_col, max_col, min_row, max_row)),   // The previous play attempt was invalid, so roll back one level
         LetterUsage::Finished => Ok((true, min_col, max_col, min_row, max_row)),    // The previous play attempt solved the board, so we can return up the chain!
@@ -494,10 +579,10 @@ fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usiz
                             let new_max_col = cmp::max(max_col, col_idx+word.len());
                             let new_min_row = cmp::min(min_row, row_idx);
                             let new_max_row = cmp::max(max_row, row_idx);
-                            if is_board_valid_horizontal(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, col_idx, col_idx+word.len(), valid_words_set) {
+                            if is_board_valid_horizontal(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, col_idx, col_idx+word.len()-1, valid_words_set, valid_words_backwards_set) {
                                 // If it's valid, go to the next recursive level (where completion will be checked)
                                 play_sequence.push((word.clone(), (res.1[0].0, res.1[0].1, Direction::Horizontal)));
-                                let res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, valid_words_vec, valid_words_set, letters, depth+1, play_sequence, previous_play_sequence, stop_me)?;
+                                let res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, valid_words_vec, valid_words_set, valid_words_backwards_set, letters, depth+1, play_sequence, previous_play_sequence, stop_me)?;
                                 if res2.0 && !stop_me.load(Ordering::Relaxed) {
                                     // If that recursive stack finishes successfully, we're done! (could have used another Result or Option rather than a bool in the returned tuple, but oh well)
                                     return Ok(res2);
@@ -518,9 +603,9 @@ fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usiz
                             let new_max_col = cmp::max(max_col, col_idx);
                             let new_min_row = cmp::min(min_row, row_idx);
                             let new_max_row = cmp::max(max_row, row_idx+word.len());
-                            if is_board_valid_vertical(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, row_idx+word.len(), col_idx, &valid_words_set) {
+                            if is_board_valid_vertical(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, row_idx+word.len()-1, col_idx, valid_words_set, valid_words_backwards_set) {
                                 play_sequence.push((word.clone(), (res.1[0].0, res.1[0].1, Direction::Vertical)));
-                                let res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, valid_words_vec, valid_words_set, letters, depth+1, play_sequence, previous_play_sequence, stop_me)?;
+                                let res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, valid_words_vec, valid_words_set, valid_words_backwards_set, letters, depth+1, play_sequence, previous_play_sequence, stop_me)?;
                                 if res2.0 && !stop_me.load(Ordering::Relaxed) {
                                     return Ok(res2);
                                 }
@@ -559,10 +644,10 @@ fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usiz
                                 let new_max_col = cmp::max(max_col, col_idx+word.len());
                                 let new_min_row = cmp::min(min_row, row_idx);
                                 let new_max_row = cmp::max(max_row, row_idx);
-                                if is_board_valid_horizontal(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, col_idx, col_idx+word.len(), valid_words_set) {
+                                if is_board_valid_horizontal(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, col_idx, col_idx+word.len()-1, valid_words_set, valid_words_backwards_set) {
                                     // If it's valid, go to the next recursive level (where completion will be checked)
                                     play_sequence.push((word.clone(), (res.1[0].0, res.1[0].1, Direction::Horizontal)));
-                                    let res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, valid_words_vec, valid_words_set, letters, depth+1, play_sequence, previous_play_sequence, stop_me)?;
+                                    let res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, valid_words_vec, valid_words_set, valid_words_backwards_set, letters, depth+1, play_sequence, previous_play_sequence, stop_me)?;
                                     if res2.0 && !stop_me.load(Ordering::Relaxed) {
                                         // If that recursive stack finishes successfully, we're done! (could have used another Result or Option rather than a bool in the returned tuple, but oh well)
                                         return Ok(res2);
@@ -600,9 +685,9 @@ fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usiz
                                 let new_max_col = cmp::max(max_col, col_idx);
                                 let new_min_row = cmp::min(min_row, row_idx);
                                 let new_max_row = cmp::max(max_row, row_idx+word.len());
-                                if is_board_valid_vertical(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, row_idx+word.len(), col_idx, &valid_words_set) {
+                                if is_board_valid_vertical(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, row_idx+word.len()-1, col_idx, valid_words_set, valid_words_backwards_set) {
                                     play_sequence.push((word.clone(), (res.1[0].0, res.1[0].1, Direction::Vertical)));
-                                    let res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, valid_words_vec, valid_words_set, letters, depth+1, play_sequence, previous_play_sequence, stop_me)?;
+                                    let res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, valid_words_vec, valid_words_set, valid_words_backwards_set, letters, depth+1, play_sequence, previous_play_sequence, stop_me)?;
                                     if res2.0 && !stop_me.load(Ordering::Relaxed) {
                                         return Ok(res2);
                                     }
@@ -638,11 +723,11 @@ fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usiz
                                 let new_max_col = cmp::max(max_col, col_idx);
                                 let new_min_row = cmp::min(min_row, row_idx);
                                 let new_max_row = cmp::max(max_row, row_idx+word.len());
-                                if is_board_valid_vertical(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, row_idx+word.len(), col_idx, &valid_words_set) {
+                                if is_board_valid_vertical(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, row_idx+word.len()-1, col_idx, &valid_words_set, &valid_words_backwards_set) {
                                     // let new_valid_words_vec: Vec<Word> = valid_words_vec.iter().filter(|word| check_filter_after_play(letters, word, &res.2)).map(|word| word.clone()).collect();
                                     // let new_valid_words_set: HashSet<Word> = HashSet::from_iter(new_valid_words_vec.clone());
                                     play_sequence.push((word.clone(), (res.1[0].0, res.1[0].1, Direction::Vertical)));
-                                    let res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, valid_words_vec, valid_words_set, letters, depth+1, play_sequence, previous_play_sequence, stop_me)?;
+                                    let res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, valid_words_vec, valid_words_set, valid_words_backwards_set, letters, depth+1, play_sequence, previous_play_sequence, stop_me)?;
                                     if res2.0 && !stop_me.load(Ordering::Relaxed) {
                                         return Ok(res2);
                                     }
@@ -674,9 +759,9 @@ fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usiz
                                 let new_max_col = cmp::max(max_col, col_idx+word.len());
                                 let new_min_row = cmp::min(min_row, row_idx);
                                 let new_max_row = cmp::max(max_row, row_idx);
-                                if is_board_valid_horizontal(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, col_idx, col_idx+word.len(), valid_words_set) {
+                                if is_board_valid_horizontal(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, col_idx, col_idx+word.len()-1, valid_words_set, valid_words_backwards_set) {
                                     play_sequence.push((word.clone(), (res.1[0].0, res.1[0].1, Direction::Horizontal)));
-                                    let res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, valid_words_vec, valid_words_set, letters, depth+1, play_sequence, previous_play_sequence, stop_me)?;
+                                    let res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, valid_words_vec, valid_words_set, valid_words_backwards_set, letters, depth+1, play_sequence, previous_play_sequence, stop_me)?;
                                     if res2.0 && !stop_me.load(Ordering::Relaxed) {
                                         return Ok(res2);
                                     }
@@ -709,10 +794,11 @@ fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usiz
 /// * `min_row` - Minimum occupied row index in `board`
 /// * `max_row` - Maximum occupied row index in `board`
 /// * `letter` - The numeric representation of the letter to play
-/// * `valid_words_set` - `HashSet` of all valid words
+/// * `valid_words_set` - HashSet of all valid words
+/// * `valid_words_backwards` - HashSet of all reversed valid words
 /// # Returns
 /// `Option` - either `None` if no solution was found, or a `Some` tuple of `(row, col, new_min_col, new_max_col, new_min_row, new_max_row)` on success
-fn play_one_letter(board: &mut Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, letter: usize, valid_words_set: &HashSet<Word>) -> Option<(usize, usize, usize, usize, usize, usize)> {
+fn play_one_letter(board: &mut Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, letter: usize, valid_words_set: &HashSet<Word>, valid_words_backwards_set: &HashSet<Word>) -> Option<(usize, usize, usize, usize, usize, usize)> {
     // Loop through all possible locations and check if the letter works there
     for row in min_row-1..max_row+2 {
         for col in min_col-1..max_col+2 {
@@ -724,7 +810,7 @@ fn play_one_letter(board: &mut Board, min_col: usize, max_col: usize, min_row: u
                     let new_min_row = cmp::min(min_row, row);
                     let new_max_row = cmp::max(max_row, row);
                     // Could also use `is_board_valid_vertical`
-                    if is_board_valid_horizontal(board, new_min_col, new_max_col, new_min_row, new_max_row, row, col, col, valid_words_set) {
+                    if is_board_valid_horizontal(board, new_min_col, new_max_col, new_min_row, new_max_row, row, col, col, valid_words_set, valid_words_backwards_set) {
                         // If it's valid, return the (potentially) new bounds, along with the location the letter was played
                         return Some((row, col, new_min_col, new_max_col, new_min_row, new_max_row));
                     }
@@ -740,7 +826,24 @@ fn play_one_letter(board: &mut Board, min_col: usize, max_col: usize, min_row: u
     return None;
 }
 
-fn play_existing(previous_play_sequence: &PlaySequence, valid_words_vec: &Vec<Word>, valid_words_set: &HashSet<Word>, letters: Letters) -> Option<(Board, PlaySequence, usize, usize, usize, usize)> {
+/// Attempts to play off an existing board
+/// # Arguments
+/// * `previous_play_sequence` - Sequence of previous played moves
+/// * `valid_words_vec` - Vector of valid words for the given hand of letters
+/// * `valid_words_set` - HashSet of valid words (HashSet of `valid_words_vec` for faster membership checking)
+/// * `valid_words_backwards_set` - HashSet of valid reversed words
+/// * `letters` - Array of the number of each letter in the hand
+/// # Returns
+/// `Option` with:
+/// * `Board` - updated board
+/// * `PlaySequence` - updated play sequence
+/// * `usize` - Minimum occupied column index in `board`
+/// * `usize` - Maximum occupied column index in `board`
+/// * `usize` - Minimum occupied row index in `board`
+/// * `usize` - Maximum occupied row index in `board`
+/// 
+/// *or `None` if no valid play can be made on the existing board*
+fn play_existing(previous_play_sequence: &PlaySequence, valid_words_vec: &Vec<Word>, valid_words_set: &HashSet<Word>, valid_words_backwards_set: &HashSet<Word>, letters: Letters) -> Option<(Board, PlaySequence, usize, usize, usize, usize)> {
     let mut board = Board::new();
     let row = previous_play_sequence[0].1.0;
     let col_start = previous_play_sequence[0].1.1;
@@ -755,7 +858,7 @@ fn play_existing(previous_play_sequence: &PlaySequence, valid_words_vec: &Vec<Wo
     let mut play_sequence: PlaySequence = Vec::with_capacity(50);
     play_sequence.push((word.clone(), (row, col_start, Direction::Horizontal)));
     let stop = Arc::new(AtomicBool::new(false));    // Just to match the signature
-    let res = play_further(&mut board, min_col, max_col, min_row, max_row, valid_words_vec, valid_words_set, letters, 0, &mut play_sequence, previous_play_sequence, &stop);
+    let res = play_further(&mut board, min_col, max_col, min_row, max_row, valid_words_vec, valid_words_set, valid_words_backwards_set, letters, 0, &mut play_sequence, previous_play_sequence, &stop);
     match res {
         Ok(result) => {
             if result.0 {
@@ -816,6 +919,96 @@ struct AppState {
     all_words_long: Vec<Word>,
     /// The last game state (if `None`, then no previous game has been played)
     last_game: Mutex<Option<GameState>>
+}
+
+/// Generates random letters based on user input
+/// # Arguments
+/// * `what` - Whether to generate characters from an "infinite set" (i.e. all are equal likelihood),
+/// or selected from "standard Bananagrams" (144 tiles) or "double Bananagrams" (288 tiles)
+/// * `how_many` - How many tiles to randomly generate; must be greater than 0, and less than 144 for regular Bananagrams,
+/// or 288 for double
+/// # Returns
+/// `Result` of mapping of each uppercase Latin character to the number of times it's present
+/// 
+/// *or String `Err` upon failure*
+#[tauri::command]
+async fn get_random_letters(what: String, how_many: i64, _state: State<'_, AppState>) -> Result<HashMap<char, u64>, String> {
+    if how_many < 1 {
+        return Err("The number to choose should be greater than 0".to_owned());
+    }
+    let mut rng = thread_rng();
+    let mut return_chars: HashMap<char, u64> = HashMap::with_capacity(26);
+    UPPERCASE.chars().for_each(|c| {return_chars.insert(c, 0);});
+    if what == "infinite set" {
+        // For "infinite set", randomly generate characters
+        let uni = Uniform::new_inclusive(0, 25);
+        for _ in 0..how_many {
+            let random_num: u8 = uni.sample(&mut rng);
+            let random_char = (random_num+65) as char;
+            let old_val = return_chars.get(&random_char);
+            match old_val {
+                Some(v) => {
+                    return_chars.insert(random_char, v+1);
+                },
+                None => {
+                    return Err(format!("Missing value in return dictionary: {}", random_char));
+                }
+            }
+        }
+    }
+    else if what == "standard Bananagrams" {
+        if how_many > 144 {
+            return Err("The number to choose must be less than 144 for standard Banangrams".to_owned());
+        }
+        // For regular Bananagrams, first make the vector of characters to choose form
+        let mut to_choose_from: Vec<char> = Vec::with_capacity(144);
+        for (i, c) in UPPERCASE.chars().enumerate() {
+            for _num_letter in 0..REGULAR_TILES[i] {
+                to_choose_from.push(c);
+            }
+        }
+        // Then selected `how_many` characters from that vector
+        let selected_chars: Vec<char> = to_choose_from.choose_multiple(&mut rng, how_many as usize).cloned().collect();
+        for i in 0..selected_chars.len() {
+            let old_val = return_chars.get(&selected_chars[i]);
+            match old_val {
+                Some(v) => {
+                    return_chars.insert(selected_chars[i], v+1);
+                },
+                None => {
+                    return Err(format!("Missing value in return dictionary: {}", selected_chars[i]));
+                }
+            }
+        }
+    }
+    else if what == "double Bananagrams" {
+        // "double Bananagrams" is just like regular, except with twice as many pieces
+        if how_many > 288 {
+            return Err("The number to choose must be less than 288 for double Banangrams".to_owned());
+        }
+        let mut to_choose_from: Vec<char> = Vec::with_capacity(288);
+        for (i, c) in UPPERCASE.chars().enumerate() {
+            for _num_letter in 0..REGULAR_TILES[i]*2 {
+                to_choose_from.push(c);
+            }
+        }
+        let selected_chars: Vec<char> = to_choose_from.choose_multiple(&mut rng, how_many as usize).cloned().collect();
+        for i in 0..selected_chars.len() {
+            let old_val = return_chars.get(&selected_chars[i]);
+            match old_val {
+                Some(v) => {
+                    return_chars.insert(selected_chars[i], v+1);
+                },
+                None => {
+                    return Err(format!("Missing value in return dictionary: {}", selected_chars[i]));
+                }
+            }
+        }
+    }
+    else {
+        return Err(format!("`what` must be \"infinite set\", \"standard Bananagrams\", or \"double Bananagrams\", not {}", what))
+    }
+    return Ok(return_chars);
 }
 
 /// Async command executed by the frontend to get the playable words for a given hand of letters
@@ -927,8 +1120,14 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                     // If only a single letter has increased by one, then first check just that letter
                     let valid_words_vec: Vec<Word> = state.all_words_short.iter().filter(|word| is_makeable(word, letters)).map(|word| word.clone()).collect();
                     let valid_words_set: HashSet<Word> = HashSet::from_iter(valid_words_vec.clone());
+                    let mut valid_words_backwards_set: HashSet<Word> = HashSet::with_capacity(valid_words_vec.len());
+                    valid_words_vec.iter().for_each(|word| {
+                        let mut new_word = word.clone();
+                        new_word.reverse();
+                        valid_words_backwards_set.insert(new_word);
+                    });
                     let mut board = prev_state.board.clone();
-                    let res = play_one_letter(&mut board, prev_state.min_col, prev_state.max_col, prev_state.min_row, prev_state.max_row, seen_greater, &valid_words_set);
+                    let res = play_one_letter(&mut board, prev_state.min_col, prev_state.max_col, prev_state.min_row, prev_state.max_row, seen_greater, &valid_words_set, &valid_words_backwards_set);
                     match res {
                         Some(result) => {
                             let mut play_sequence = prev_state.play_sequence.clone();
@@ -938,7 +1137,7 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                         },
                         None => {
                             // If we failed when playing one letter, try playing off the existing board
-                            let attempt = play_existing(&prev_state.play_sequence, &valid_words_vec, &valid_words_set, letters);
+                            let attempt = play_existing(&prev_state.play_sequence, &valid_words_vec, &valid_words_set, &valid_words_backwards_set, letters);
                             match attempt {
                                 Some(result) => {
                                     *last_game_state = Some(GameState { board: result.0.clone(), min_col: result.2, max_col: result.3, min_row: result.4, max_row: result.5, letters, play_sequence: result.1.clone() });
@@ -953,7 +1152,13 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                     // If a letter has increased by more than one, or multiple have increased by one or more, then try playing off the existing board
                     let valid_words_vec: Vec<Word> = state.all_words_short.iter().filter(|word| is_makeable(word, letters)).map(|word| word.clone()).collect();
                     let valid_words_set: HashSet<Word> = HashSet::from_iter(valid_words_vec.clone());
-                    let attempt = play_existing(&prev_state.play_sequence, &valid_words_vec, &valid_words_set, letters);
+                    let mut valid_words_backwards_set: HashSet<Word> = HashSet::with_capacity(valid_words_vec.len());
+                    valid_words_vec.iter().for_each(|word| {
+                        let mut new_word = word.clone();
+                        new_word.reverse();
+                        valid_words_backwards_set.insert(new_word);
+                    });
+                    let attempt = play_existing(&prev_state.play_sequence, &valid_words_vec, &valid_words_set, &valid_words_backwards_set, letters);
                     match attempt {
                         Some(result) => {
                             *last_game_state = Some(GameState { board: result.0.clone(), min_col: result.2, max_col: result.3, min_row: result.4, max_row: result.5, letters, play_sequence: result.1.clone() });
@@ -1014,10 +1219,16 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                 let word_letters: HashSet<&usize> = HashSet::from_iter(word.iter());
                 let new_valid_words_vec: Vec<Word> = copied_new_valid_words_vec.iter().filter(|word| check_filter_after_play(use_letters, word, &word_letters)).map(|word| word.clone()).collect();
                 let new_valid_words_set: HashSet<Word> = HashSet::from_iter(new_valid_words_vec.clone());
+                let mut new_valid_words_backwards_set: HashSet<Word> = HashSet::with_capacity(new_valid_words_vec.len());
+                new_valid_words_vec.iter().for_each(|word| {
+                        let mut new_word = word.clone();
+                        new_word.reverse();
+                        new_valid_words_backwards_set.insert(new_word);
+                    });
                 let mut play_sequence: PlaySequence = Vec::with_capacity(50);
                 play_sequence.push((word.clone(), (row, col_start, Direction::Horizontal)));
                 // Begin the recursive processing
-                let result = play_further(&mut board, min_col, max_col, min_row, max_row, &new_valid_words_vec, &new_valid_words_set, letters, 0, &mut play_sequence, &Vec::new(), &stop_t);
+                let result = play_further(&mut board, min_col, max_col, min_row, max_row, &new_valid_words_vec, &new_valid_words_set, &new_valid_words_backwards_set, letters, 0, &mut play_sequence, &Vec::new(), &stop_t);
                 match result {
                     // If the result was good, then store it and signal other threads to finish (so long as another thread isn't doing so)
                     Ok(res) => {
@@ -1088,9 +1299,15 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                 let word_letters: HashSet<&usize> = HashSet::from_iter(word.iter());
                 let new_valid_words_vec: Vec<Word> = copied_new_valid_words_vec.iter().filter(|word| check_filter_after_play(use_letters, word, &word_letters)).map(|word| word.clone()).collect();
                 let new_valid_words_set: HashSet<Word> = HashSet::from_iter(new_valid_words_vec.clone());
+                let mut new_valid_words_backwards_set: HashSet<Word> = HashSet::with_capacity(new_valid_words_vec.len());
+                new_valid_words_vec.iter().for_each(|word| {
+                        let mut new_word = word.clone();
+                        new_word.reverse();
+                        new_valid_words_backwards_set.insert(new_word);
+                    });
                 let mut play_sequence: PlaySequence = Vec::with_capacity(50);
                 play_sequence.push((word.clone(), (row, col_start, Direction::Horizontal)));
-                let result = play_further(&mut board, min_col, max_col, min_row, max_row, &new_valid_words_vec, &new_valid_words_set, letters, 0, &mut play_sequence, &Vec::new(), &stop_t);
+                let result = play_further(&mut board, min_col, max_col, min_row, max_row, &new_valid_words_vec, &new_valid_words_set, &new_valid_words_backwards_set, letters, 0, &mut play_sequence, &Vec::new(), &stop_t);
                 match result {
                     Ok(res) => {
                         if res.0 && !stop_t.load(Ordering::Relaxed) {
@@ -1133,7 +1350,7 @@ fn main() {
     let all_words_long: Vec<Word> = include_str!("dictionary.txt").lines().map(convert_word_to_array).collect();
     tauri::Builder::default()
         .manage(AppState { all_words_short, all_words_long, last_game: None.into() })
-        .invoke_handler(tauri::generate_handler![play_bananagrams, reset, get_playable_words])
+        .invoke_handler(tauri::generate_handler![play_bananagrams, reset, get_playable_words, get_random_letters])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

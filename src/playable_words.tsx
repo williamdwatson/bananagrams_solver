@@ -35,7 +35,7 @@ interface PlayableWordsProps {
 export default function PlayableWords(props: PlayableWordsProps) {
     return (
         <>
-        <Dialog header="Playable words" visible={props.visible} onHide={() => props.setVisible(false)} contentStyle={{width: "35vw", maxHeight: "85vh"}} pt={{mask: {onContextMenu: e => e.preventDefault()}}}>
+        <Dialog header="Playable words" visible={props.visible} onHide={() => props.setVisible(false)} contentStyle={{width: "35vw", maxHeight: "85vh", overflowY: "hidden"}} pt={{mask: {onContextMenu: e => e.preventDefault()}}}>
             <TabView>
                 <TabPanel header="Common words">
                     <PlayableWordsList playableWords={props.playableWords?.short} which="common"/>

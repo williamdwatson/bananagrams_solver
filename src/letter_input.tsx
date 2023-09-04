@@ -10,6 +10,7 @@ import { Toast } from "primereact/toast";
 import { readText, writeText } from "@tauri-apps/api/clipboard";
 import { invoke } from "@tauri-apps/api/tauri";
 import { Dropdown } from "primereact/dropdown";
+import { TabPanel, TabView } from "primereact/tabview";
 
 interface LetterInputProps {
     /**
@@ -87,7 +88,9 @@ export default function LetterInput(props: LetterInputProps){
     const [lettersInvalid, setLettersInvalid] = useState<Map<string, boolean>>(invalid);
     const [typeInVisible, setTypeInVisible] = useState(false);
     const [typedIn, setTypedIn] = useState("");
-    const [playableWordsLoading, setPlayableWordsLoading] = useState(false);   
+    const [randomNum, setRandomNum] = useState("21");
+    const [randomFrom, setRandomFrom] = useState<"standard Bananagrams"|"double Bananagrams"|"infinite set">("standard Bananagrams");
+    const [playableWordsLoading, setPlayableWordsLoading] = useState(false);
 
     // Show the custom context menu on right click
     useEffect(() => {
@@ -297,6 +300,16 @@ export default function LetterInput(props: LetterInputProps){
     }
 
     /**
+     * Cancels the letter input by closing the popup and reseting all fields
+     */
+    const cancelInput = () => {
+        setTypeInVisible(false);
+        setTypedIn("");
+        setRandomNum("21");
+        setRandomFrom("standard Bananagrams");
+    }
+
+    /**
      * Callback when the "Use letters" button is clicked
      */
     const useLetters = () => {
@@ -305,8 +318,35 @@ export default function LetterInput(props: LetterInputProps){
             new_map.set(c, count_letter_in_string(c, typedIn));
         });
         setLetterNums(new_map);
-        setTypeInVisible(false);
-        setTypedIn("");
+        cancelInput();
+    }
+
+    /**
+     * Chooses random letters based on the user's input
+     */
+    const chooseRandomly = () => {
+        const val = parseInt(randomNum);
+        if (randomNum.trim() === "" || isNaN(val) || val <= 0) {
+            props.toast.current?.show({severity: "warn", summary: "Invalid number", detail: "The number of letters to choose must be greater than 0"});
+        }
+        else if (val > 144 && randomFrom === "standard Bananagrams") {
+            props.toast.current?.show({severity: "warn", summary: "Too many letters", detail: "No more than 144 tiles can be chosen from standard Bananagrams"});
+        }
+        else if (val > 288 && randomFrom === "double Bananagrams") {
+            props.toast.current?.show({severity: "warn", summary: "Too many letters", detail: "No more than 288 tiles can be chosen from double Bananagrams"});
+        }
+        else {
+            invoke("get_random_letters", {what: randomFrom, howMany: val}).then(res => {
+                const result = res as Record<string, number>;
+                const new_map = new Map<string, number>();
+                UPPERCASE.forEach(c => {
+                    new_map.set(c, result[c] ?? 0);
+                });
+                setLetterNums(new_map);
+                cancelInput();
+            })
+            .catch(error => props.toast.current?.show({severity: "error", summary: "Error generating letters", detail: "An error occurred generating random letters: " + error}));
+        }
     }
 
     /**
@@ -336,6 +376,10 @@ export default function LetterInput(props: LetterInputProps){
         }
     }
 
+    /**
+     * Resets either the hand or board after confirmation
+     * @param which Whether to reset the hand ("Reset hand") or the board ("Reset board")
+     */
     const doReset = (which: "Reset hand"|"Reset board") => {
         if (which === "Reset hand") {
             resetLetters();
@@ -375,13 +419,28 @@ export default function LetterInput(props: LetterInputProps){
         <ContextMenu model={items} ref={cm}/>
         {[...individual_cms]}
         {/* <ContextMenu model={individual_items} ref={individual_cm}/> */}
-        <Dialog header="Type in letters" visible={typeInVisible} onHide={() => setTypeInVisible(false)}>
-            <form onSubmit={e => {e.preventDefault(); useLetters()}} autoComplete="off">
-                <InputText value={typedIn} onChange={e => setTypedIn(e.target.value.toUpperCase())} keyfilter="alpha" id="typeIn"/>
-                <br/>
-                <Button type="submit" label="Use letters" style={{marginTop: "5px", marginRight: "5px"}}/>
-                <Button type="reset" label="Cancel" severity="secondary" onClick={() => {setTypedIn(""); setTypeInVisible(false)}}/>
-            </form>
+        <Dialog header="Input letters" visible={typeInVisible} onHide={() => setTypeInVisible(false)}>
+            <TabView>
+                <TabPanel header="Type in letters">
+                    <form onSubmit={e => {e.preventDefault(); useLetters()}} autoComplete="off">
+                        <InputText value={typedIn} onChange={e => setTypedIn(e.target.value.toUpperCase())} keyfilter="alpha" id="typeIn"/>
+                        <br/>
+                        <Button type="submit" label="Use letters" style={{marginTop: "5px", marginRight: "5px"}}/>
+                        <Button type="reset" label="Cancel" severity="secondary" onClick={() => cancelInput()}/>
+                    </form>
+                </TabPanel>
+                <TabPanel header="Choose randomly">
+                    <form onSubmit={e=> {e.preventDefault(); chooseRandomly()}} autoComplete="off">
+                        <span>Choose </span>
+                        <InputText value={randomNum} onChange={e => setRandomNum(e.target.value)} keyfilter="int" size={3}/>
+                        <span> random letters from </span>
+                        <Dropdown value={randomFrom} onChange={e => setRandomFrom(e.value)} options={["standard Bananagrams", "double Bananagrams", "infinite set"]}/>
+                        <br/>
+                        <Button type="submit" label="Choose letters" style={{marginTop: "5px", marginRight: "5px"}}/>
+                        <Button type="reset" label="Cancel" severity="secondary" onClick={() => cancelInput()}/>
+                    </form>
+                </TabPanel>
+            </TabView>            
         </Dialog>
         <div>
             {UPPERCASE.map((c, i) => {
@@ -394,7 +453,7 @@ export default function LetterInput(props: LetterInputProps){
         </div>
         <br/>
         <div className="button-div">
-            <Button type="button" label="Type in letters" style={{padding: "8px", marginTop: "5px", marginRight: "2%"}} onClick={() => setTypeInVisible(true)}/>
+            <Button type="button" label="Input letters" style={{padding: "8px", marginTop: "5px", marginRight: "2%"}} onClick={() => setTypeInVisible(true)}/>
             <Button type="button" label="View playable words" icon="pi pi-book" iconPos="right" style={{padding: "8px", marginTop: "5px"}} onClick={viewPlayableWords} loading={playableWordsLoading}/>
         </div>
         <div className="button-div">
