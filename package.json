@@ -12,6 +12,7 @@
     "dependencies": {
         "@tauri-apps/api": "^1.4.0",
         "html2canvas": "^1.4.1",
+        "pretty-ms": "^8.0.0",
         "primeicons": "^6.0.1",
         "primereact": "^9.6.2",
         "react": "^18.2.0",

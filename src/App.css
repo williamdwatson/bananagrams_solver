@@ -2,6 +2,10 @@ body {
   font-family: sans-serif;
 }
 
+#results-table {
+  z-index: 2;
+}
+
 .results-tbody {
   align-items: center;
   display: inline-block;

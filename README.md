@@ -1,4 +1,4 @@
-# Tauri + React + Typescript
+# Bananagrams solver
 
 ## Usage
 The simplest way to run is to download one of the prebuilt installers under the `Releases` section of GitHub. Alternatively, build from source:

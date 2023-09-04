@@ -5,12 +5,14 @@ import { MenuItem } from "primereact/menuitem";
 import { writeText } from "@tauri-apps/api/clipboard";
 import { Toast } from "primereact/toast";
 import html2canvas from "html2canvas";
+import SolutionTime from "./solution_time";
+import { result_t } from "./types";
 
 interface ResultsDisplayProps {
     /**
      * 2D array of the results board (or an empty array if not processed)
      */
-    results: string[][],
+    results: result_t|null,
     /**
      * Mouse event for a right-click in the results SplitterPanel
      */
@@ -44,18 +46,20 @@ export default function ResultsDisplay(props: ResultsDisplayProps) {
      * the only difference is that "table" inserts tabs between each character in a row
      */
     const copyResults = (what: "text"|"table") => {
-        let s = '';
-        props.results.forEach((row, i) => {
-            if (row.some(val => val.trim() !== "")) {
-                row.forEach((val, j) => {
-                    s += (val.trim() === "" ? " " : val) + (what === "table" && j < row.length-1 ? "\t" : "");
-                });
-            }
-            if (i < props.results.length-2) {
-                s += "\n";
-            }
-        });
-        writeText(s);
+        if (props.results != null) {
+            let s = '';
+            props.results.board.forEach((row, i) => {
+                if (row.some(val => val.trim() !== "")) {
+                    row.forEach((val, j) => {
+                        s += (val.trim() === "" ? " " : val) + (what === "table" && j < row.length-1 ? "\t" : "");
+                    });
+                }
+                if (i < props.results!.board.length-2) {
+                    s += "\n";
+                }
+            });
+            writeText(s);
+        }
     }
 
     /**
@@ -105,12 +109,12 @@ export default function ResultsDisplay(props: ResultsDisplayProps) {
      * Context menu items
      */
     const items: MenuItem[] = [
-        { label: "Copy as text", icon: "pi pi-copy", disabled: props.results.length === 0, command: () => copyResults("text")},
-        { label: "Copy as table", icon: "pi pi-file-excel", disabled: props.results.length === 0, command: () => copyResults("table")},
+        { label: "Copy as text", icon: "pi pi-copy", disabled: props.results == null || props.results.board.length === 0, command: () => copyResults("text")},
+        { label: "Copy as table", icon: "pi pi-file-excel", disabled: props.results == null || props.results.board.length === 0, command: () => copyResults("table")},
         { separator: true },
-        { label: "Save as image", icon: "pi pi-save", disabled: props.results.length === 0, command: saveImage },
+        { label: "Save as image", icon: "pi pi-save", disabled: props.results == null || props.results.board.length === 0, command: saveImage },
         { separator: true },
-        { label: "Reset", icon: "pi pi-eraser", disabled: props.results.length === 0 || props.running, command: resetBoard}
+        { label: "Reset", icon: "pi pi-eraser", disabled: props.results == null || props.results.board.length === 0 || props.running, command: resetBoard}
     ];
 
     // Effect to display the custom context menu when a right-click occurs
@@ -124,10 +128,11 @@ export default function ResultsDisplay(props: ResultsDisplayProps) {
         <>
         <ConfirmDialog/>
         <ContextMenu model={items} ref={cm}/>
-        {props.results.length === 0 ? null :
+        {props.results == null || props.results.board.length === 0 ? null :
+        <>
         <table id="results-table">
             <tbody className="results-tbody">
-                {props.results.map((row, i) => {
+                {props.results.board.map((row, i) => {
                     return (
                         <tr key={"row-"+i} className="results-tr">
                             {row.map((val, j) => {
@@ -143,6 +148,8 @@ export default function ResultsDisplay(props: ResultsDisplayProps) {
                 })}
             </tbody>
         </table>
+        <SolutionTime time={props.results.elapsed}/>
+        </>
         }
         </>
     )

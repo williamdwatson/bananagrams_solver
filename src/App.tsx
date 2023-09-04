@@ -10,12 +10,13 @@ import "./App.css";
 import LetterInput from "./letter_input";
 import ResultsDisplay from "./results_display";
 import PlayableWords from "./playable_words";
+import { result_t } from "./types";
 
 function App() {
     const toast = useRef<Toast>(null);
     const [running, setRunning] = useState(false);
-    const [results, setResults] = useState<string[][]>([]);
-    const [runTimeLetters, setRunTimeLetters] = useState<[number, Map<string, number>]>([0, new Map()]);
+    const [results, setResults] = useState<result_t|null>(null);
+    const [letters, setLetters] = useState<Map<string, number>>(new Map());
     const [letterInputContextMenu, setLetterInputContextMenu] = useState<MouseEvent<HTMLDivElement>|null>(null);
     const [resultsContextMenu, setResultsContextMenu] = useState<MouseEvent<HTMLDivElement>|null>(null);
     const [playableWordsVisible, setPlayableWordsVisible] = useState(false);
@@ -26,14 +27,18 @@ function App() {
     //     document.addEventListener("contextmenu", e => e.preventDefault())
     // }, []);
 
-    // Callback when runTimeLetters changes (since the hooks don't allow a callback)
-    useEffect(() => {
-        if (runTimeLetters[0] !== 0) {
-            invoke("play_bananagrams", { availableLetters: runTimeLetters[1] })
+    /**
+     * Runs the solver
+     * @param letters Mapping of length-one letter strings to the number of that letter present in the hand
+     */
+    const startRunning = (letters: Map<string, number>) => {
+        setRunning(true);
+        setLetters(letters);
+        invoke("play_bananagrams", { availableLetters: letters })
             .then(res => {
-                setResults(res as string[][]);
-                const t = new Date().getTime();
-                if (t - runTimeLetters[0] > 5000) {
+                const results = res as result_t;
+                setResults(results);
+                if (results.elapsed > 5000) {
                     sendNotification({ title: "Completed", body: "The board has been solved!" });
                 }
             })
@@ -41,16 +46,6 @@ function App() {
                 toast.current?.show({severity: "error", summary: "Uh oh!", detail: "" + error});
             })
             .finally(() => setRunning(false));
-        }
-    }, [runTimeLetters]);
-
-    /**
-     * Runs the solver
-     * @param letters Mapping of length-one letter strings to the number of that letter present in the hand
-     */
-    const startRunning = (letters: Map<string, number>) => {
-        setRunning(true);
-        setRunTimeLetters([new Date().getTime(), letters]);
     }
 
     /**
@@ -59,7 +54,7 @@ function App() {
     const clearResults = () => {
         if (!running) {
             invoke("reset").then(()=> {
-                setResults([]);
+                setResults(null);
             })
             .catch(error => {
                 toast.current?.show({severity: "error", summary: "Uh oh!", detail: "" + error});
