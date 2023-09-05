@@ -25,7 +25,8 @@ jobs:
       run: |
           git config --global user.name 'William Watson'
           git config --global user.email 'williamdwatson@users.noreply.github.com'
-          git commit -am "Automated documentation update"
+          git add -A
+          git commit -m "Automated documentation update"
           git push
     # - name: Build
     #   run: cargo build --verbose
