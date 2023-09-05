@@ -1,0 +1,10 @@
+D:\a\bananagrams_solver\bananagrams_solver\src-tauri\../docs\debug\deps\wry-9495e9808cc749a5.rmeta: C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wry-0.24.3\src\lib.rs C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wry-0.24.3\src\application.rs C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wry-0.24.3\src\webview\mod.rs C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wry-0.24.3\src\webview\web_context.rs C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wry-0.24.3\src\webview\webview2\mod.rs C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wry-0.24.3\src\webview\webview2\file_drop.rs
+
+D:\a\bananagrams_solver\bananagrams_solver\src-tauri\../docs\debug\deps\wry-9495e9808cc749a5.d: C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wry-0.24.3\src\lib.rs C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wry-0.24.3\src\application.rs C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wry-0.24.3\src\webview\mod.rs C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wry-0.24.3\src\webview\web_context.rs C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wry-0.24.3\src\webview\webview2\mod.rs C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wry-0.24.3\src\webview\webview2\file_drop.rs
+
+C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wry-0.24.3\src\lib.rs:
+C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wry-0.24.3\src\application.rs:
+C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wry-0.24.3\src\webview\mod.rs:
+C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wry-0.24.3\src\webview\web_context.rs:
+C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wry-0.24.3\src\webview\webview2\mod.rs:
+C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wry-0.24.3\src\webview\webview2\file_drop.rs:

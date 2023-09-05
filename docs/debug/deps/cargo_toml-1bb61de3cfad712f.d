@@ -1,0 +1,10 @@
+D:\a\bananagrams_solver\bananagrams_solver\src-tauri\../docs\debug\deps\cargo_toml-1bb61de3cfad712f.rmeta: C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\cargo_toml-0.15.3\src/cargo_toml.rs C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\cargo_toml-0.15.3\src\afs.rs C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\cargo_toml-0.15.3\src\error.rs C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\cargo_toml-0.15.3\src\inheritable.rs
+
+D:\a\bananagrams_solver\bananagrams_solver\src-tauri\../docs\debug\deps\libcargo_toml-1bb61de3cfad712f.rlib: C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\cargo_toml-0.15.3\src/cargo_toml.rs C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\cargo_toml-0.15.3\src\afs.rs C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\cargo_toml-0.15.3\src\error.rs C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\cargo_toml-0.15.3\src\inheritable.rs
+
+D:\a\bananagrams_solver\bananagrams_solver\src-tauri\../docs\debug\deps\cargo_toml-1bb61de3cfad712f.d: C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\cargo_toml-0.15.3\src/cargo_toml.rs C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\cargo_toml-0.15.3\src\afs.rs C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\cargo_toml-0.15.3\src\error.rs C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\cargo_toml-0.15.3\src\inheritable.rs
+
+C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\cargo_toml-0.15.3\src/cargo_toml.rs:
+C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\cargo_toml-0.15.3\src\afs.rs:
+C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\cargo_toml-0.15.3\src\error.rs:
+C:\Users\runneradmin\.cargo\registry\src\index.crates.io-6f17d22bba15001f\cargo_toml-0.15.3\src\inheritable.rs:
