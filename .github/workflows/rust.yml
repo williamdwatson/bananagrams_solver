@@ -3,16 +3,16 @@ name: Rust
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  documentation:
 
     runs-on: windows-latest
+
+    if: ${{ !contains(github.event.head_commit.message, 'Automated documentation update') }}
 
     steps:
     - uses: actions/checkout@v3
