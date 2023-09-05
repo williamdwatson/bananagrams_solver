@@ -12,7 +12,7 @@ import ResultsDisplay from "./results_display";
 import PlayableWords from "./playable_words";
 import { result_t } from "./types";
 
-function App() {
+export default function App() {
     const toast = useRef<Toast>(null);
     const [running, setRunning] = useState(false);
     const [results, setResults] = useState<result_t|null>(null);
@@ -75,5 +75,3 @@ function App() {
         </>
     );
 }
-
-export default App;

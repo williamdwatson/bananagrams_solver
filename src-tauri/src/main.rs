@@ -89,22 +89,22 @@ fn convert_array_to_word(arr: &Word) -> String {
 /// * `max_row` - Maximum occupied row index
 /// # Returns
 /// * `String` - `board` in string form (with all numbers converted to letters)
-// fn board_to_string(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize) -> String {
-//     let mut board_string: Vec<char> = Vec::with_capacity((max_row-min_row)*(max_col-min_col));
-//     for row in min_row..max_row+1 {
-//         for col in min_col..max_col+1 {
-//             if board.get_val(row, col) == EMPTY_VALUE {
-//                 board_string.push(' ');
-//             }
-//             else {
-//                 board_string.push((board.get_val(row, col) as u8+65) as char);
-//             }
-//         }
-//         board_string.push('\n');
-//     }
-//     let s: String = board_string.iter().collect();
-//     return s.trim_end().to_owned();
-// }
+fn _board_to_string(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize) -> String {
+    let mut board_string: Vec<char> = Vec::with_capacity((max_row-min_row)*(max_col-min_col));
+    for row in min_row..max_row+1 {
+        for col in min_col..max_col+1 {
+            if board.get_val(row, col) == EMPTY_VALUE {
+                board_string.push(' ');
+            }
+            else {
+                board_string.push((board.get_val(row, col) as u8+65) as char);
+            }
+        }
+        board_string.push('\n');
+    }
+    let s: String = board_string.iter().collect();
+    return s.trim_end().to_owned();
+}
 
 /// Converts a `board` to a vector of vectors of chars
 /// # Arguments
