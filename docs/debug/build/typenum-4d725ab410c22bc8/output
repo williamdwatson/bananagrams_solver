@@ -1,3 +1,0 @@
-cargo:rerun-if-changed=build/main.rs
-cargo:rustc-env=TYPENUM_BUILD_CONSTS=D:\a\bananagrams_solver\bananagrams_solver\src-tauri\../docs\debug\build\typenum-4d725ab410c22bc8\out\consts.rs
-cargo:rustc-env=TYPENUM_BUILD_OP=D:\a\bananagrams_solver\bananagrams_solver\src-tauri\../docs\debug\build\typenum-4d725ab410c22bc8\out\op.rs
