@@ -1,5 +1,8 @@
 # Bananagrams solver
 
+![Screenshot of a solution of a board](example.png)
+*Example solution of a board with 50 random tiles*
+
 ## Usage
 The simplest way to run is to download one of the prebuilt installers under the `Releases` section of GitHub. Alternatively, build from source:
 ### Setup
