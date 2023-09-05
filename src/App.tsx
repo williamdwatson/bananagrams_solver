@@ -1,4 +1,3 @@
-import { sendNotification } from "@tauri-apps/api/notification";
 import { useState, useRef, useEffect, MouseEvent } from "react";
 import "primereact/resources/themes/tailwind-light/theme.css";
 import "primereact/resources/primereact.min.css";
@@ -6,6 +5,7 @@ import 'primeicons/primeicons.css';
 import { Splitter, SplitterPanel } from "primereact/splitter";
 import { Toast } from "primereact/toast";
 import { invoke } from "@tauri-apps/api/tauri";
+import { sendNotification } from "@tauri-apps/api/notification";
 import "./App.css";
 import LetterInput from "./letter_input";
 import ResultsDisplay from "./results_display";
@@ -16,16 +16,15 @@ function App() {
     const toast = useRef<Toast>(null);
     const [running, setRunning] = useState(false);
     const [results, setResults] = useState<result_t|null>(null);
-    const [letters, setLetters] = useState<Map<string, number>>(new Map());
     const [letterInputContextMenu, setLetterInputContextMenu] = useState<MouseEvent<HTMLDivElement>|null>(null);
     const [resultsContextMenu, setResultsContextMenu] = useState<MouseEvent<HTMLDivElement>|null>(null);
     const [playableWordsVisible, setPlayableWordsVisible] = useState(false);
     const [playableWords, setPlayableWords] = useState<{short: string[], long: string[]}|null>(null);
 
     // Disable right-clicking elsewhere on the page
-    // useEffect(() => {
-    //     document.addEventListener("contextmenu", e => e.preventDefault())
-    // }, []);
+    useEffect(() => {
+        document.addEventListener("contextmenu", e => e.preventDefault());
+    }, []);
 
     /**
      * Runs the solver
@@ -33,7 +32,6 @@ function App() {
      */
     const startRunning = (letters: Map<string, number>) => {
         setRunning(true);
-        setLetters(letters);
         invoke("play_bananagrams", { availableLetters: letters })
             .then(res => {
                 const results = res as result_t;

@@ -1,3 +1,6 @@
+/**
+ * Type of the return after a solution is found
+ */
 export type result_t = {
     /**
      * 2D array of characters of the solution

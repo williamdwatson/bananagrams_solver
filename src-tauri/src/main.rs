@@ -426,15 +426,15 @@ fn undo_play(board: &mut Board, played_indices: &Vec<(usize, usize)>) {
 /// # Arguments
 /// * `letters` - Length-26 array of originally available letters
 /// * `word_being_checked` - Word that is being checked if playable
-/// * `previous_word_letters` - Set of the letters of the first word
+/// * `played_on_board` - Set of the letters played on the board
 /// # Returns
 /// * `bool` - Whether the `word_being_checked` is playable
-fn check_filter_after_play(letters: Letters, word_being_checked: &Word, previous_word_letters: &HashSet<&usize>) -> bool {
+fn check_filter_after_play(letters: Letters, word_being_checked: &Word, played_on_board: &HashSet<&usize>) -> bool {
     let mut available_letters: [isize; 26] = unsafe { mem::transmute(letters) };//letters.into_iter().map(|l| l as isize).collect();
     let mut already_seen_negative = false;
     for letter in word_being_checked.iter() {
         let elem = unsafe { available_letters.get_unchecked_mut(*letter) };
-        if *elem == 0 && !previous_word_letters.contains(letter) {
+        if *elem == 0 && !played_on_board.contains(letter) {
             return false;
         }
         else if *elem == 0 && already_seen_negative {
@@ -544,9 +544,10 @@ fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usiz
             // If trying to play the board was invalid, undo the play
             undo_play(board, &res.1);
         }
+        return Ok((false, min_col, max_col, min_row, max_row));
     }
     // If we're at an odd depth, play horizontally first (trying to alternate horizontal-vertical-horizontal as a heuristic to solve faster)
-    if depth % 2 == 1 {
+    else if depth % 2 == 1 {
         for word in valid_words_vec.iter() {
             // Stop if we're signalled to
             if stop_me.load(Ordering::Relaxed) {
@@ -660,8 +661,6 @@ fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usiz
                         let new_min_row = cmp::min(min_row, row_idx);
                         let new_max_row = cmp::max(max_row, row_idx+word.len());
                         if is_board_valid_vertical(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, row_idx+word.len()-1, col_idx, &valid_words_set) {
-                            // let new_valid_words_vec: Vec<Word> = valid_words_vec.iter().filter(|word| check_filter_after_play(letters, word, &res.2)).map(|word| word.clone()).collect();
-                            // let new_valid_words_set: HashSet<Word> = HashSet::from_iter(new_valid_words_vec.clone());
                             play_sequence.push((word.clone(), (res.1[0].0, res.1[0].1, Direction::Vertical)));
                             match res.3 {
                                 LetterUsage::Finished => {
@@ -813,7 +812,7 @@ fn play_existing(previous_play_sequence: &PlaySequence, valid_words_vec: &Vec<Wo
         return Some((board, play_sequence, min_col, max_col, min_row, max_row));
     }
     else {
-        let new_valid_words_vec: Vec<Word> = valid_words_vec.iter().filter(|word| check_filter_after_play(use_letters, word, &word_letters)).map(|word| word.clone()).collect();
+        let new_valid_words_vec: Vec<Word> = valid_words_vec.iter().filter(|word| check_filter_after_play(use_letters.clone(), word, &word_letters)).map(|word| word.clone()).collect();
         let stop = Arc::new(AtomicBool::new(false));    // Just to match the signature
         let res = play_further(&mut board, min_col, max_col, min_row, max_row, &new_valid_words_vec, valid_words_set, use_letters, 0, &mut play_sequence, previous_play_sequence, &stop);
         match res {
@@ -1185,7 +1184,7 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                 else {
                     // Reduce the set of remaining words to check to those that can be played with the letters not in the first word (plus only one of the tiles played in the first word)
                     let word_letters: HashSet<&usize> = HashSet::from_iter(word.iter());
-                    let new_valid_words_vec: Vec<Word> = copied_new_valid_words_vec.iter().filter(|word| check_filter_after_play(use_letters, word, &word_letters)).map(|word| word.clone()).collect();
+                    let new_valid_words_vec: Vec<Word> = copied_new_valid_words_vec.iter().filter(|word| check_filter_after_play(use_letters.clone(), word, &word_letters)).map(|word| word.clone()).collect();
                     let valid_words_set: HashSet<Word> = HashSet::from_iter(copied_new_valid_words_vec.clone());
                     // Begin the recursive processing
                     let result = play_further(&mut board, min_col, max_col, min_row, max_row, &new_valid_words_vec, &valid_words_set, use_letters, 0, &mut play_sequence, &Vec::new(), &stop_t);
@@ -1270,7 +1269,7 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                 }
                 else {
                     let word_letters: HashSet<&usize> = HashSet::from_iter(word.iter());
-                    let new_valid_words_vec: Vec<Word> = copied_new_valid_words_vec.iter().filter(|word| check_filter_after_play(use_letters, word, &word_letters)).map(|word| word.clone()).collect();
+                    let new_valid_words_vec: Vec<Word> = copied_new_valid_words_vec.iter().filter(|word| check_filter_after_play(use_letters.clone(), word, &word_letters)).map(|word| word.clone()).collect();
                     let valid_words_set: HashSet<Word> = HashSet::from_iter(copied_new_valid_words_vec.clone());
                     let result = play_further(&mut board, min_col, max_col, min_row, max_row, &new_valid_words_vec, &valid_words_set, use_letters, 0, &mut play_sequence, &Vec::new(), &stop_t);
                     match result {

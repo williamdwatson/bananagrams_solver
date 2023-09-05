@@ -50,6 +50,10 @@ interface LetterInputProps {
  * Array of all uppercase Latin letters in alphabetical order
  */
 const UPPERCASE = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
+/**
+ * Array of all digits
+ */
+const DIGITS = [..."0123456789"];
 
 /**
  * For inputting a hand of letters and starting a solve
@@ -58,6 +62,8 @@ const UPPERCASE = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
  */
 export default function LetterInput(props: LetterInputProps){
     const cm = useRef<ContextMenu|null>(null);
+    const type_in_cm = useRef<ContextMenu|null>(null);
+    const random_num_cm = useRef<ContextMenu|null>(null);
     const m = new Map();
     const num_letters = new Map<string, number>();
     const invalid = new Map<string, boolean>();
@@ -262,6 +268,55 @@ export default function LetterInput(props: LetterInputProps){
     ];
 
     /**
+     * Function for pasting into the letter input field
+     */
+    const pasteTypeIn = () => {
+        readText().then(val => {
+            if (val != null) {
+                let s = "";
+                let all_valid = true;
+                for (const char of val) {
+                    if (!UPPERCASE.includes(char.toUpperCase())) {
+                        all_valid = false;
+                        break;
+                    }
+                    s += char.toUpperCase();
+                }
+                if (all_valid) {
+                    setTypedIn(s);
+                }
+            }
+        });
+    }
+
+    /**
+     * Function for pasting into the random number field
+     */
+    const pasteRandomNum = () => {
+        readText().then(val => {
+            if (val != null && [...val].every(char => DIGITS.includes(char))) {
+                setRandomNum(val);
+            }
+        });
+    }
+
+    /**
+     * Context menu items for the letter input field
+     */
+    const type_in_items: MenuItem[] = [
+        { label: "Copy", icon: "pi pi-copy", command: () => writeText(typedIn) },
+        { label: "Paste", icon: "pi pi-file-import", command: pasteTypeIn }
+    ];
+
+    /**
+     * Context menu items for the random number input field
+     */
+    const random_num_items: MenuItem[] = [
+        { label: "Copy", icon: "pi pi-copy", command: () => writeText(randomNum) },
+        { label: "Paste", icon: "pi pi-file-import", command: pasteRandomNum }
+    ];
+
+    /**
      * Callback when a number is changed for a specified letter
      * @param c The letter of the number being changed
      * @param e The input change event
@@ -304,9 +359,12 @@ export default function LetterInput(props: LetterInputProps){
      */
     const cancelInput = () => {
         setTypeInVisible(false);
-        setTypedIn("");
-        setRandomNum("21");
-        setRandomFrom("standard Bananagrams");
+        // So the dialog has time to finish its close animation before the fields are updated
+        setTimeout(() => {
+            setTypedIn("");
+            setRandomNum("21");
+            setRandomFrom("standard Bananagrams");
+        }, 100);
     }
 
     /**
@@ -417,13 +475,14 @@ export default function LetterInput(props: LetterInputProps){
     return (
         <>
         <ContextMenu model={items} ref={cm}/>
+        <ContextMenu model={type_in_items} ref={type_in_cm}/>
+        <ContextMenu model={random_num_items} ref={random_num_cm}/>
         {[...individual_cms]}
-        {/* <ContextMenu model={individual_items} ref={individual_cm}/> */}
         <Dialog header="Input letters" visible={typeInVisible} onHide={() => setTypeInVisible(false)}>
             <TabView>
                 <TabPanel header="Type in letters">
                     <form onSubmit={e => {e.preventDefault(); useLetters()}} autoComplete="off">
-                        <InputText value={typedIn} onChange={e => setTypedIn(e.target.value.toUpperCase())} keyfilter="alpha" id="typeIn"/>
+                        <InputText value={typedIn} onChange={e => setTypedIn(e.target.value.toUpperCase())} keyfilter="alpha" id="typeIn" onContextMenu={e => type_in_cm.current?.show(e)}/>
                         <br/>
                         <Button type="submit" label="Use letters" style={{marginTop: "5px", marginRight: "5px"}}/>
                         <Button type="reset" label="Cancel" severity="secondary" onClick={() => cancelInput()}/>
@@ -432,7 +491,7 @@ export default function LetterInput(props: LetterInputProps){
                 <TabPanel header="Choose randomly">
                     <form onSubmit={e=> {e.preventDefault(); chooseRandomly()}} autoComplete="off">
                         <span>Choose </span>
-                        <InputText value={randomNum} onChange={e => setRandomNum(e.target.value)} keyfilter="int" size={3}/>
+                        <InputText value={randomNum} onChange={e => setRandomNum(e.target.value)} keyfilter="int" size={3} onContextMenu={e => random_num_cm.current?.show(e)}/>
                         <span> random letters from </span>
                         <Dropdown value={randomFrom} onChange={e => setRandomFrom(e.value)} options={["standard Bananagrams", "double Bananagrams", "infinite set"]}/>
                         <br/>
