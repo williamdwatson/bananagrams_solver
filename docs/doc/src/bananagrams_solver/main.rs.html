@@ -1319,10 +1319,12 @@
 <a href="#1319" id="1319">1319</a>
 <a href="#1320" id="1320">1320</a>
 <a href="#1321" id="1321">1321</a>
+<a href="#1322" id="1322">1322</a>
 </pre></div><pre class="rust"><code><span class="comment">// Prevents additional console window on Windows in release, DO NOT REMOVE!!
 </span><span class="attr">#![cfg_attr(not(debug_assertions), windows_subsystem = <span class="string">&quot;windows&quot;</span>)]
 
-</span><span class="kw">use </span>std::{cmp, fmt, mem, thread, usize, collections::HashMap, collections::HashSet};
+</span><span class="kw">use </span>std::{cmp, fmt, mem, thread, usize, collections::HashMap};
+<span class="kw">use </span>hashbrown::HashSet;
 <span class="kw">use </span>std::sync::atomic::{AtomicBool, Ordering};
 <span class="kw">use </span>std::sync::{Arc, Mutex};
 <span class="kw">use </span>std::time::Instant;
