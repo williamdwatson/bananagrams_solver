@@ -17,6 +17,7 @@ tauri = { version = "1.4.1", features = [ "clipboard-read-text", "clipboard-writ
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rand = "0.8.5"
+hashbrown = "0.14.0"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

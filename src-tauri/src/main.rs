@@ -1,7 +1,8 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{cmp, fmt, mem, thread, usize, collections::HashMap, collections::HashSet};
+use std::{cmp, fmt, mem, thread, usize, collections::HashMap};
+use hashbrown::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
