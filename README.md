@@ -1,7 +1,11 @@
 # Bananagrams solver
 
-![Screenshot of a solution of a board](example.png)
-*Example solution of a board with 50 random tiles*
+This is a standalone [Bananagrams](https://bananagrams.com/) solving program (not affiliated in any way with the official Bananagrams), complete with GUI. It was built using TypeScript React for the frontend and Tauri Rust for the backend.
+
+The underlying algorithm has a few heuristics - it favors longer words and boards that alternate horizontally-vertically - but ultimately is exhaustive (if there is a solution, it will be found). It is generally very fast for smaller hands, and is still relatively performant for large hands. However, if there is no possible solution to a large hand processing can be slow. Note that the solver is multithreaded and hence is not deterministic (i.e. multiple runs with the same hand can lead to different solutions).
+
+![Screenshot of a solution of a board using all 144 standard Bananagrams tiles](example.png)
+*Example solution of a board using all 144 standard Bananagrams tiles - smaller boards are much faster*
 
 ## Usage
 The simplest way to run is to download one of the prebuilt installers under the `Releases` section of GitHub. Alternatively, build from source:
@@ -11,6 +15,8 @@ The simplest way to run is to download one of the prebuilt installers under the 
 3. In the repository directory, run `npm install`
 ### Running
 Run `npm run tauri dev` to launch the program in development mode (with code watching/hot reloading); run `npm run tauri build` to compile the standalone program/installer in release mode.
+### Documentation
+Code documentation can be found [here](https://williamdwatson.github.io/bananagrams_solver/doc/bananagrams_solver/index.html).
 
 ## Code Layout
 The `src` folder holds the frontend code, written in Typescript React. `App.tsx` is the parent of the frontend components (technically `main.tsx` is the parent, but it is essentially a wrapper); the components include `letter_input.tsx` for inputing which letters are in the hand and `results_display.tsx` which dislays the results as a table.

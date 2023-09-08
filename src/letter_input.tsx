@@ -87,7 +87,7 @@ export default function LetterInput(props: LetterInputProps){
                     }
                 });
             }}
-        ]
+        ];
         individual_cms.push(<ContextMenu model={individual_items} ref={individual_cm} key={"cm-"+c}/>);
     });
     const [letterNums, setLetterNums] = useState<Map<string, number|null|undefined>>(m);
@@ -509,6 +509,7 @@ export default function LetterInput(props: LetterInputProps){
                     </span>
                 )
             })}
+            <span style={{whiteSpace: "nowrap", marginLeft: "15px", marginRight: "5px"}}><b>Total letters:</b> {Array.from(letterNums.values()).reduce((previousValue, val) => previousValue!+val!, 0)}</span>
         </div>
         <br/>
         <div className="button-div">

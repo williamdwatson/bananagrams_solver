@@ -4,7 +4,15 @@ interface SolutionTimeProps {
     /**
      * The time in milliseconds it took to solve the board
      */
-    time: number
+    time: number,
+    /**
+     * Number of letters played
+     */
+    num_letters: number,
+    /**
+     * Density of the played letters on the board
+     */
+    density: number
 }
 
 /**
@@ -15,7 +23,7 @@ interface SolutionTimeProps {
 export default function SolutionTime(props: SolutionTimeProps) {
     // Green-to-red color palette; see https://color-hex.org/color-palettes/187
     const COLORS = ["#2CBA00", "#8EDE00", "#D9D009", "#FFA700", "#FF0000"];
-    const lims = [100, 500, 1000, 2000];
+    const lims = [100, 500, 1000, 5000];
     let color = COLORS[COLORS.length-1];
     for (let i=0; i<lims.length; i++) {
         if (props.time < lims[i]) {
@@ -26,6 +34,8 @@ export default function SolutionTime(props: SolutionTimeProps) {
     return (
         <span style={{position: "fixed", bottom: "3vh", right: "3vw"}}>
             Completed in <span style={{color: color}}>{prettyMilliseconds(props.time)}</span>
+            &nbsp;({prettyMilliseconds(props.time/props.num_letters, {formatSubMilliseconds: true, compact: true})}/letter)
+            with {props.density.toFixed(2)} letter{props.density.toFixed(2) === "1.00" ? "" : "s"} per square
         </span>
     )
 }

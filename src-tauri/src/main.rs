@@ -116,21 +116,56 @@ fn _board_to_string(board: &Board, min_col: usize, max_col: usize, min_row: usiz
 /// * `max_row` - Maximum occupied row index
 /// # Returns
 /// * `Vec<Vec<char>>` - `board` in vector form (with all numbers converted to letters)
-fn board_to_vec(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize) -> Vec<Vec<char>> {
-    let mut board_vec: Vec<Vec<char>> = Vec::with_capacity(max_row-min_row);
+fn board_to_vec(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, previous_idxs: &HashSet<(usize, usize)>) -> Vec<Vec<String>> {
+    let mut board_vec: Vec<Vec<String>> = Vec::with_capacity(max_row-min_row);
     for row in min_row..max_row+1 {
-        let mut row_vec: Vec<char> = Vec::with_capacity(max_col-min_col);
+        let mut row_vec: Vec<String> = Vec::with_capacity(max_col-min_col);
         for col in min_col..max_col+1 {
             if board.get_val(row, col) == EMPTY_VALUE {
-                row_vec.push(' ');
+                row_vec.push(' '.to_string());
             }
             else {
-                row_vec.push((board.get_val(row, col) as u8+65) as char);
+                if !previous_idxs.contains(&(row, col)) {
+                    row_vec.push(((board.get_val(row, col) as u8+65) as char).to_string());
+                }
+                else {
+                    row_vec.push(((board.get_val(row, col) as u8+65) as char).to_string() + "*");
+                }
             }
         }
         board_vec.push(row_vec);
     }
     return board_vec;
+}
+
+/// Gets which indices overlap between `previous_play_sequence` and `new_play_sequence`
+/// # Arguments
+/// * `previous_play_sequence` - The play sequence the last time the board was played
+/// * `new_play_sequence` - The new play sequence whose overlap is being compared with `previous_play_sequence`
+/// # Returns
+/// `previous_idxs` - HashSet of the indices in the board where each overlapping letter between the two sequences was played; may be empty
+fn get_previous_idxs(previous_play_sequence: &PlaySequence, new_play_sequence: &PlaySequence) -> HashSet<(usize, usize)> {
+    let mut previous_idxs: HashSet<(usize, usize)> = HashSet::new();
+    for i in 0..cmp::min(previous_play_sequence.len(), new_play_sequence.len()) {
+        if previous_play_sequence[i] == new_play_sequence[i] {
+            let word_len = previous_play_sequence[i].0.len();
+            let start_row = previous_play_sequence[i].1.0;
+            let start_col = previous_play_sequence[i].1.1;
+            match previous_play_sequence[i].1.2 {
+                Direction::Horizontal => {
+                    for j in 0..word_len {
+                        previous_idxs.insert((start_row, start_col+j));
+                    }
+                },
+                Direction::Vertical => {
+                    for j in 0..word_len {
+                        previous_idxs.insert((start_row+j, start_col));
+                    }
+                }
+            }
+        }
+    }
+    return previous_idxs;
 }
 
 /// Checks whether a `word` can be made using the given `letters`
@@ -304,7 +339,7 @@ impl fmt::Debug for LetterUsage {
 }
 
 /// Enumeration of the direction a word is played
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 enum Direction {
     /// The word was played horizontally
     Horizontal,
@@ -855,7 +890,7 @@ struct PlayableWords {
 #[derive(Serialize)]
 struct Solution {
     /// The solved board
-    board: Vec<Vec<char>>,
+    board: Vec<Vec<String>>,
     /// How long it took to solve the board
     elapsed: u128
 }
@@ -1060,8 +1095,10 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
             return Err("Failed to get lock on last game state".to_owned());
         }
     }
+    let mut previous_play_sequence: Option<PlaySequence> = None;
     match &*last_game_state {   // I don't like &*
         Some(prev_state) => {
+            previous_play_sequence = Some(prev_state.play_sequence.clone());
             // If a board has been played, check whether the letters are the same as before, or if some are more or less
             let mut comparison = LetterComparison::Same;
             let mut seen_greater: usize = EMPTY_VALUE;
@@ -1082,7 +1119,7 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
             match comparison {
                 LetterComparison::Same => {
                     // If the hand is the same then no need to do anything
-                    return Ok(Solution { board: board_to_vec(&prev_state.board, prev_state.min_col, prev_state.max_col, prev_state.min_row, prev_state.max_row), elapsed: now.elapsed().as_millis() });
+                    return Ok(Solution { board: board_to_vec(&prev_state.board, prev_state.min_col, prev_state.max_col, prev_state.min_row, prev_state.max_row, &HashSet::new()), elapsed: now.elapsed().as_millis() });
                 },
                 LetterComparison::GreaterByOne => {
                     // If only a single letter has increased by one, then first check just that letter
@@ -1094,16 +1131,18 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                         Some(result) => {
                             let mut play_sequence = prev_state.play_sequence.clone();
                             play_sequence.push((vec![seen_greater], (result.0, result.1, Direction::Horizontal)));
+                            let previous_idxs = get_previous_idxs(&prev_state.play_sequence, &play_sequence);
                             *last_game_state = Some(GameState { board: board.clone(), min_col: result.2, max_col: result.3, min_row: result.4, max_row: result.5, letters, play_sequence });
-                            return Ok(Solution { board: board_to_vec(&board, result.2, result.3, result.4, result.5), elapsed: now.elapsed().as_millis() });
+                            return Ok(Solution { board: board_to_vec(&board, result.2, result.3, result.4, result.5, &previous_idxs), elapsed: now.elapsed().as_millis() });
                         },
                         None => {
                             // If we failed when playing one letter, try playing off the existing board
                             let attempt = play_existing(&prev_state.play_sequence, &valid_words_vec, &valid_words_set, &letters);
                             match attempt {
                                 Some(result) => {
+                                    let previous_idxs = get_previous_idxs(&prev_state.play_sequence, &result.1);
                                     *last_game_state = Some(GameState { board: result.0.clone(), min_col: result.2, max_col: result.3, min_row: result.4, max_row: result.5, letters, play_sequence: result.1.clone() });
-                                    return Ok(Solution { board: board_to_vec(&result.0, result.2, result.3, result.4, result.5), elapsed: now.elapsed().as_millis() });
+                                    return Ok(Solution { board: board_to_vec(&result.0, result.2, result.3, result.4, result.5, &previous_idxs), elapsed: now.elapsed().as_millis() });
                                 },
                                 None => {/* If we failed again, continue with the code that starts from scratch */}
                             }
@@ -1117,8 +1156,9 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                     let attempt = play_existing(&prev_state.play_sequence, &valid_words_vec, &valid_words_set, &letters);
                     match attempt {
                         Some(result) => {
+                            let previous_idxs = get_previous_idxs(&prev_state.play_sequence, &result.1);
                             *last_game_state = Some(GameState { board: result.0.clone(), min_col: result.2, max_col: result.3, min_row: result.4, max_row: result.5, letters, play_sequence: result.1.clone() });
-                            return Ok(Solution { board: board_to_vec(&result.0, result.2, result.3, result.4, result.5), elapsed: now.elapsed().as_millis() });
+                            return Ok(Solution { board: board_to_vec(&result.0, result.2, result.3, result.4, result.5, &previous_idxs), elapsed: now.elapsed().as_millis() });
                         },
                         None => {/* If we failed, continue with the code that starts from scratch */}
                     }
@@ -1147,7 +1187,7 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
     // Prepare for threading/early termination using `AtomicBool`
     let stop = Arc::new(AtomicBool::new(false));
     let mut handles: Vec<thread::JoinHandle<()>> = Vec::with_capacity(chunks.len());
-    let char_vec: Vec<(Vec<Vec<char>>, Board, usize, usize, usize, usize, PlaySequence)> = Vec::new();
+    let char_vec: Vec<(Vec<Vec<String>>, Board, usize, usize, usize, usize, PlaySequence)> = Vec::new();
     let ret_val = Arc::new(Mutex::new(char_vec));
     // For each thread (i.e. piece of available parallelism), spawn a new thread to check those words
     // These threads check different sets of initial words in the board, and whichever finishes first signals the others to stop
@@ -1156,6 +1196,7 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
         let new_letters = letters.clone();
         let copied_new_valid_words_vec = valid_words_vec.clone();
         let conn = ret_val.clone();
+        let copied_previous_play_sequence = previous_play_sequence.clone();
         let handle = thread::spawn(move || {
             // Loop through each word and play it on a new board
             for word in chunk.iter() {
@@ -1178,7 +1219,14 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                         stop_t.store(true, Ordering::Relaxed);
                         // The expect may panic the thread but I think that's ok
                         let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
-                        ret.push((board_to_vec(&board, min_col, max_col, min_row, max_row), board.clone(), min_col, max_col, min_row, max_row, play_sequence));
+                        let previous_idxs: HashSet<(usize, usize)>;
+                        match copied_previous_play_sequence {
+                            Some(prev) => {
+                                previous_idxs = get_previous_idxs(&prev, &play_sequence);
+                            },
+                            None => {previous_idxs = HashSet::new();}
+                        }
+                        ret.push((board_to_vec(&board, min_col, max_col, min_row, max_row, &previous_idxs), board.clone(), min_col, max_col, min_row, max_row, play_sequence));
                         break;
                     }
                 }
@@ -1196,7 +1244,14 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                                 stop_t.store(true, Ordering::Relaxed);
                                 // The expect will panic the thread but I think that's ok
                                 let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
-                                ret.push((board_to_vec(&board, res.1, res.2, res.3, res.4), board.clone(), res.1, res.2, res.3, res.4, play_sequence));
+                                let previous_idxs: HashSet<(usize, usize)>;
+                                match copied_previous_play_sequence {
+                                    Some(prev) => {
+                                        previous_idxs = get_previous_idxs(&prev, &play_sequence);
+                                    },
+                                    None => {previous_idxs = HashSet::new();}
+                                }
+                                ret.push((board_to_vec(&board, res.1, res.2, res.3, res.4, &previous_idxs), board.clone(), res.1, res.2, res.3, res.4, play_sequence));
                                 break;
                             }
                         },
@@ -1215,7 +1270,7 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
         let _res = handle.join();
     }
     // If we're done, store the result in the `State` and return the result to the frontend
-    let ret: std::sync::MutexGuard<'_, Vec<(Vec<Vec<char>>, Board, usize, usize, usize, usize, Vec<(Vec<usize>, (usize, usize, Direction))>)>>;
+    let ret: std::sync::MutexGuard<'_, Vec<(Vec<Vec<String>>, Board, usize, usize, usize, usize, Vec<(Vec<usize>, (usize, usize, Direction))>)>>;
     match ret_val.lock() {
         Ok(locked) => {
             ret = locked;
@@ -1236,13 +1291,14 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
     let chunks: Vec<Vec<Word>> = valid_words_vec.chunks(chunk_size.ceil() as usize).map(|words| words.to_vec()).collect();
     let stop = Arc::new(AtomicBool::new(false));
     let mut handles: Vec<thread::JoinHandle<()>> = Vec::with_capacity(chunks.len());
-    let char_vec: Vec<(Vec<Vec<char>>, Board, usize, usize, usize, usize, PlaySequence)> = Vec::new();
+    let char_vec: Vec<(Vec<Vec<String>>, Board, usize, usize, usize, usize, PlaySequence)> = Vec::new();
     let ret_val = Arc::new(Mutex::new(char_vec));
     for chunk in chunks.into_iter() {
         let stop_t = stop.clone();
         let new_letters = letters.clone();
         let copied_new_valid_words_vec = valid_words_vec.clone();
         let conn = ret_val.clone();
+        let copied_previous_play_sequence = previous_play_sequence.clone();
         let handle = thread::spawn(move || {
             for word in chunk.iter() {
                 let mut board = Board::new();
@@ -1264,7 +1320,14 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                         stop_t.store(true, Ordering::Relaxed);
                         // The expect may panic the thread but I think that's ok
                         let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
-                        ret.push((board_to_vec(&board, min_col, max_col, min_row, max_row), board.clone(), min_col, max_col, min_row, max_row, play_sequence));
+                        let previous_idxs: HashSet<(usize, usize)>;
+                        match copied_previous_play_sequence {
+                            Some(prev) => {
+                                previous_idxs = get_previous_idxs(&prev, &play_sequence);
+                            },
+                            None => {previous_idxs = HashSet::new();}
+                        }
+                        ret.push((board_to_vec(&board, min_col, max_col, min_row, max_row, &previous_idxs), board.clone(), min_col, max_col, min_row, max_row, play_sequence));
                         break;
                     }
                 }
@@ -1279,7 +1342,14 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                                 stop_t.store(true, Ordering::Relaxed);
                                 // The expect will panic the thread but I think that's ok
                                 let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
-                                ret.push((board_to_vec(&board, res.1, res.2, res.3, res.4), board.clone(), res.1, res.2, res.3, res.4, play_sequence));
+                                let previous_idxs: HashSet<(usize, usize)>;
+                                match copied_previous_play_sequence {
+                                    Some(prev) => {
+                                        previous_idxs = get_previous_idxs(&prev, &play_sequence);
+                                    },
+                                    None => {previous_idxs = HashSet::new();}
+                                }
+                                ret.push((board_to_vec(&board, res.1, res.2, res.3, res.4, &previous_idxs), board.clone(), res.1, res.2, res.3, res.4, play_sequence));
                                 break;
                             }
                         },
@@ -1295,7 +1365,7 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
     for handle in handles.into_iter() {
         let _res = handle.join();
     }
-    let ret_long: std::sync::MutexGuard<'_, Vec<(Vec<Vec<char>>, Board, usize, usize, usize, usize, Vec<(Vec<usize>, (usize, usize, Direction))>)>>;
+    let ret_long: std::sync::MutexGuard<'_, Vec<(Vec<Vec<String>>, Board, usize, usize, usize, usize, Vec<(Vec<usize>, (usize, usize, Direction))>)>>;
     match ret_val.lock() {
         Ok(locked) => {
             ret_long = locked;

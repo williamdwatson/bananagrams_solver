@@ -51,7 +51,7 @@ function StatisticTable(props: StatisticTableProps) {
     return (
         <DataTable sortField="what" sortOrder={1} value={Array.from(props.values.entries()).map(([label, value]) => { return {what: label, number: value} })}>
             <Column field="what" header={props.what} sortable dataType={props.datatype}/>
-            <Column field="number" header="Number" sortable dataType="number"/>
+            <Column field="number" header="Number" sortable dataType="number" body={row => row.number.toLocaleString()}/>
         </DataTable>
     )
 }
@@ -69,7 +69,11 @@ interface PlayableWordsStatsProps {
      * Sets whether the popup is visible
      * @param visible Whether the popup should be visible
      */
-    setVisible: (visible: boolean) => void
+    setVisible: (visible: boolean) => void,
+    /**
+     * The type of the playable words to display in the popup's title
+     */
+    type: string
 }
 
 /**
@@ -147,12 +151,27 @@ export default function PlayableWordsStats(props: PlayableWordsStatsProps) {
         });
     });
 
+    /**
+     * Finds the maximum value of a large array (since splatting an array in `Math.max(...)` can fail by overflowing the call stack if the array is too big)
+     * @param arr Array for which to find the maximum
+     * @returns The maximum element of `arr`
+     */
+    const maxForLargeArray = <T,>(arr: T[]) => {
+        let m = arr[0];
+        for (let i=0; i<arr.length; i++) {
+            if (arr[i] > m) {
+                m = arr[i];
+            }
+        }
+        return m;
+    }
+
     return (
         <>
         {props.playableWords != null ? 
-        <Dialog header="Statistics for playable words" visible={props.visible} onHide={() => props.setVisible(false)}>
-            <Statistic name="Total number" value={props.playableWords.length}/>
-            <Statistic name="Maximum length" value={Math.max(...props.playableWords.map(word => word.length))}/>
+        <Dialog header={"Statistics for " + props.type + " playable words"} visible={props.visible} onHide={() => props.setVisible(false)}>
+            <Statistic name="Total number" value={props.playableWords.length.toLocaleString()}/>
+            <Statistic name="Maximum length" value={maxForLargeArray(props.playableWords.map(word => word.length))}/>
             <Statistic name="Average length" value={(props.playableWords.reduce((previousValue, currentWord) => previousValue + currentWord.length, 0)/props.playableWords.length).toFixed(2)}/>
             <Statistic name="Most common length" value={mode(props.playableWords.map(word => word.length))}/>
             <Statistic name="Most common starting letter" value={mode(props.playableWords.map(word => word.charAt(0)))}/>

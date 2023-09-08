@@ -146,13 +146,15 @@ export default function PlayableWordsList(props: PlayableWordsListProps) {
         { label: "Paste", icon: "pi pi-file-import", command: async () => setFilter((await readText()) ?? "") }
     ];
 
+    const sorted_and_filtered = props.playableWords?.filter(checkFilter).sort(sortPlayable);
+
     return (
         <>
-        <PlayableWordsStats playableWords={props.playableWords} visible={showStats} setVisible={setShowStats}/>
+        <PlayableWordsStats playableWords={props.playableWords} visible={showStats} setVisible={setShowStats} type={props.which === "full" ? "all" : props.which}/>
         <div onContextMenu={e => cm.current?.show(e)}>
             <ContextMenu model={items} ref={cm}/>
             <ContextMenu model={filter_items} ref={filter_cm}/>
-            {props.playableWords != null ? 
+            {sorted_and_filtered != null ? 
                 <div>
                     <div className="playable-word-sort-filter">
                         <span style={{fontWeight: "bold"}}>Sort:</span>
@@ -166,7 +168,7 @@ export default function PlayableWordsList(props: PlayableWordsListProps) {
                         <InputText value={filter} onChange={e => setFilter(e.target.value.toUpperCase())} keyfilter="alpha" style={{margin: "0 5px"}} onContextMenu={e => filter_cm.current?.show(e)}/>
                         <Dropdown value={filterType} onChange={e => setFilterType(e.value)} options={["Starts with", "Does not start with", "Contains", "Does not contain", "Ends with", "Does not end with"]}/>
                     </div>
-                    <VirtualScroller items={props.playableWords.filter(checkFilter).sort(sortPlayable)} itemSize={40} itemTemplate={playableWordTemplate} style={{ width: "30vw", height: "50vh" }} />
+                    <VirtualScroller items={sorted_and_filtered} itemSize={40} itemTemplate={playableWordTemplate} style={{ width: "30vw", height: "50vh" }} />
                     <Button type="button" label="See stats" icon="pi pi-calculator" iconPos="right" onClick={() => setShowStats(true)} style={{marginTop: "5px"}}/>
             </div>
             : null}

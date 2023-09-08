@@ -1,4 +1,4 @@
-import { useEffect, useRef, MouseEvent, RefObject } from "react";
+import { useEffect, useRef, useState, MouseEvent, RefObject } from "react";
 import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import { ContextMenu } from "primereact/contextmenu";
 import { MenuItem } from "primereact/menuitem";
@@ -28,7 +28,42 @@ interface ResultsDisplayProps {
     /**
      * Whether the solver is running
      */
-    running: boolean
+    running: boolean,
+    /**
+     * The width of the containing panel in percent
+     */
+    panelWidth: number|null
+}
+
+/**
+ * Gets the current dimensions of the window; see https://stackoverflow.com/a/36862446
+ * @returns The window's dimensions
+ */
+function getWindowDimensions() {
+    const { innerWidth: width, innerHeight: height } = window;
+    return {
+        width,
+        height
+    };
+}
+
+/**
+ * Hook to get the window's width and height; see https://stackoverflow.com/a/36862446
+ * @returns The window's dimensions
+ */
+function useWindowDimensions() {
+    const [windowDimensions, setWindowDimensions] = useState(getWindowDimensions());
+
+    useEffect(() => {
+        function handleResize() {
+            setWindowDimensions(getWindowDimensions());
+        }
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    return windowDimensions;
 }
 
 /**
@@ -38,6 +73,7 @@ interface ResultsDisplayProps {
  */
 export default function ResultsDisplay(props: ResultsDisplayProps) {
     const cm = useRef<ContextMenu|null>(null);
+    const { height, width } = useWindowDimensions();
 
     /**
      * Copies the solution to the clipboard as text
@@ -124,6 +160,29 @@ export default function ResultsDisplay(props: ResultsDisplayProps) {
         }
     }, [props.contextMenu]);
 
+    // Resize the results as appropriate
+    useEffect(() => {
+        const results_table = document.getElementById("results-table");
+        if (results_table != null) {
+            let n = 115;
+            results_table.style.fontSize = n + "%";
+            while (n >= 1 && (results_table.offsetHeight > height*0.9 || (props.panelWidth != null && (results_table.offsetWidth > 0.9*width*(props.panelWidth/100))))) {
+                n -= 1;
+                results_table.style.fontSize = n + "%";
+            }
+        }
+    }, [props.results, props.panelWidth, height, width]);
+
+    let num_letters = 0;
+    props.results?.board.forEach(row => {
+        row.forEach(val => {
+            if (val.trim() !== "") {
+                num_letters += 1;
+            }
+        });
+    });
+    let density = props.results == null ? 0 : num_letters/(props.results.board.length*props.results.board[0].length)
+
     return (
         <>
         <ConfirmDialog/>
@@ -139,6 +198,9 @@ export default function ResultsDisplay(props: ResultsDisplayProps) {
                                 if (val.trim() === "") {
                                     return <td key={"row-"+i+"-cell-"+j} className="emptyCell"></td>
                                 }
+                                else if (val.length === 2) {
+                                    return <td key={"row-"+i+"-cell-"+j} className="previouslyPlayedCell">{val.charAt(0)}</td>
+                                }
                                 else {
                                     return <td key={"row-"+i+"-cell-"+j} className="occupiedCell">{val}</td>
                                 }
@@ -148,7 +210,7 @@ export default function ResultsDisplay(props: ResultsDisplayProps) {
                 })}
             </tbody>
         </table>
-        <SolutionTime time={props.results.elapsed}/>
+        <SolutionTime time={props.results.elapsed} num_letters={num_letters} density={density}/>
         </>
         }
         </>
