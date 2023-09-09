@@ -36,6 +36,7 @@ struct Board {
     arr: [usize; BOARD_SIZE*BOARD_SIZE]
 }
 impl Board {
+    /// Creates a new board of dimensions `BOARD_SIZE`x`BOARD_SIZE` filled with the `EMPTY_VALUE`
     fn new() -> Board {
         return Board { arr: [EMPTY_VALUE; BOARD_SIZE*BOARD_SIZE] }
     }
