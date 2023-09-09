@@ -24,3 +24,4 @@ docs/debug
 *.njsproj
 *.sln
 *.sw?
+.ipynb_checkpoints/
