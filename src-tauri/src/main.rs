@@ -32,14 +32,15 @@ const REGULAR_TILES: [u64; 26] = [13, 3, 3, 6, 18, 3, 4, 3, 12, 2, 2, 5, 3, 8, 1
 /// A thin wrapper for handling the board
 #[derive(Clone)]
 struct Board {
-    /// The underlying array of the board
-    arr: [usize; BOARD_SIZE*BOARD_SIZE]
+    /// The underlying vector of the board (as in optimization level 0 the array overflows the stack)
+    arr: Vec<usize>
 }
 impl Board {
     /// Creates a new board of dimensions `BOARD_SIZE`x`BOARD_SIZE` filled with the `EMPTY_VALUE`
     fn new() -> Board {
-        return Board { arr: [EMPTY_VALUE; BOARD_SIZE*BOARD_SIZE] }
+        return Board { arr: vec![EMPTY_VALUE; BOARD_SIZE*BOARD_SIZE] }
     }
+
     /// Unsafely gets a value from the board at the given index
     /// # Arguments
     /// * `row` - Row index of the value to get (must be less than `BOARD_SIZE`)
@@ -49,6 +50,7 @@ impl Board {
     fn get_val(&self, row: usize, col: usize) -> usize {
         return unsafe { *self.arr.get_unchecked(row*BOARD_SIZE + col) };
     }
+
     /// Unsafely sets a value in the board at the given index
     /// # Arguments
     /// * `row` - Row index of the value to get (must be less than `BOARD_SIZE`)
