@@ -1390,6 +1390,7 @@
 <a href="#1390" id="1390">1390</a>
 <a href="#1391" id="1391">1391</a>
 <a href="#1392" id="1392">1392</a>
+<a href="#1393" id="1393">1393</a>
 </pre></div><pre class="rust"><code><span class="comment">// Prevents additional console window on Windows in release, DO NOT REMOVE!!
 </span><span class="attr">#![cfg_attr(not(debug_assertions), windows_subsystem = <span class="string">&quot;windows&quot;</span>)]
 
@@ -1428,7 +1429,8 @@
     </span>arr: [usize; BOARD_SIZE<span class="kw-2">*</span>BOARD_SIZE]
 }
 <span class="kw">impl </span>Board {
-    <span class="kw">fn </span>new() -&gt; Board {
+    <span class="doccomment">/// Creates a new board of dimensions `BOARD_SIZE`x`BOARD_SIZE` filled with the `EMPTY_VALUE`
+    </span><span class="kw">fn </span>new() -&gt; Board {
         <span class="kw">return </span>Board { arr: [EMPTY_VALUE; BOARD_SIZE<span class="kw-2">*</span>BOARD_SIZE] }
     }
     <span class="doccomment">/// Unsafely gets a value from the board at the given index
