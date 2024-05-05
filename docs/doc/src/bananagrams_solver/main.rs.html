@@ -1,4 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src\main.rs`."><title>main.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-9bb858ba049f1f21.css" id="mainThemeStyle"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="bananagrams_solver" data-themes="" data-resource-suffix="" data-rustdoc-version="1.72.0 (5680fa18f 2023-08-23)" data-channel="1.72.0" data-search-js="search-f6292fe389d70017.js" data-settings-js="settings-de11bff964e9d4e5.js" data-settings-css="settings-8c76f75bfb6bd192.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ><script src="../../static.files/storage-59fd9b8ccb335783.js"></script><script defer src="../../static.files/source-script-106908c7a7964ba4.js"></script><script defer src="../../source-files.js"></script><script defer src="../../static.files/main-0795b7d26be81095.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../bananagrams_solver/index.html"><img class="rust-logo" src="../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src\main.rs`."><title>main.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-5bc39a1768837dd0.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="bananagrams_solver" data-themes="" data-resource-suffix="" data-rustdoc-version="1.77.2 (25ef9e3d8 2024-04-09)" data-channel="1.77.2" data-search-js="search-dd67cee4cfa65049.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-48f368f3872407c8.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
+            <h2>Files</h2></div></nav><div class="sidebar-resizer"></div>
+    <main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../bananagrams_solver/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -1391,8 +1393,10 @@
 <a href="#1391" id="1391">1391</a>
 <a href="#1392" id="1392">1392</a>
 <a href="#1393" id="1393">1393</a>
+<a href="#1394" id="1394">1394</a>
+<a href="#1395" id="1395">1395</a>
 </pre></div><pre class="rust"><code><span class="comment">// Prevents additional console window on Windows in release, DO NOT REMOVE!!
-</span><span class="attr">#![cfg_attr(not(debug_assertions), windows_subsystem = <span class="string">&quot;windows&quot;</span>)]
+</span><span class="attr">#![cfg_attr(not(debug_assertions), windows_subsystem = <span class="string">"windows"</span>)]
 
 </span><span class="kw">use </span>std::{cmp, fmt, mem, thread, usize, collections::HashMap};
 <span class="kw">use </span>hashbrown::HashSet;
@@ -1418,21 +1422,22 @@
 <span class="doccomment">/// Number rows/columns in the board
 </span><span class="kw">const </span>BOARD_SIZE: usize = <span class="number">144</span>;
 <span class="doccomment">/// All uppercase letters in the Latin alphabet
-</span><span class="kw">const </span>UPPERCASE: <span class="kw-2">&amp;</span>str = <span class="string">&quot;ABCDEFGHIJKLMNOPQRSTUVWXYZ&quot;</span>;
+</span><span class="kw">const </span>UPPERCASE: <span class="kw-2">&amp;</span>str = <span class="string">"ABCDEFGHIJKLMNOPQRSTUVWXYZ"</span>;
 <span class="doccomment">/// The number of each letter present in regular Bananagrams
 </span><span class="kw">const </span>REGULAR_TILES: [u64; <span class="number">26</span>] = [<span class="number">13</span>, <span class="number">3</span>, <span class="number">3</span>, <span class="number">6</span>, <span class="number">18</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">3</span>, <span class="number">12</span>, <span class="number">2</span>, <span class="number">2</span>, <span class="number">5</span>, <span class="number">3</span>, <span class="number">8</span>, <span class="number">11</span>, <span class="number">3</span>, <span class="number">2</span>, <span class="number">9</span>, <span class="number">6</span>, <span class="number">9</span>, <span class="number">6</span>, <span class="number">3</span>, <span class="number">3</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">2</span>];
 
 <span class="doccomment">/// A thin wrapper for handling the board
 </span><span class="attr">#[derive(Clone)]
 </span><span class="kw">struct </span>Board {
-    <span class="doccomment">/// The underlying array of the board
-    </span>arr: [usize; BOARD_SIZE<span class="kw-2">*</span>BOARD_SIZE]
+    <span class="doccomment">/// The underlying vector of the board (as in optimization level 0 the array overflows the stack)
+    </span>arr: Vec&lt;usize&gt;
 }
 <span class="kw">impl </span>Board {
     <span class="doccomment">/// Creates a new board of dimensions `BOARD_SIZE`x`BOARD_SIZE` filled with the `EMPTY_VALUE`
     </span><span class="kw">fn </span>new() -&gt; Board {
-        <span class="kw">return </span>Board { arr: [EMPTY_VALUE; BOARD_SIZE<span class="kw-2">*</span>BOARD_SIZE] }
+        <span class="kw">return </span>Board { arr: <span class="macro">vec!</span>[EMPTY_VALUE; BOARD_SIZE<span class="kw-2">*</span>BOARD_SIZE] }
     }
+
     <span class="doccomment">/// Unsafely gets a value from the board at the given index
     /// # Arguments
     /// * `row` - Row index of the value to get (must be less than `BOARD_SIZE`)
@@ -1442,6 +1447,7 @@
     </span><span class="kw">fn </span>get_val(<span class="kw-2">&amp;</span><span class="self">self</span>, row: usize, col: usize) -&gt; usize {
         <span class="kw">return unsafe </span>{ <span class="kw-2">*</span><span class="self">self</span>.arr.get_unchecked(row<span class="kw-2">*</span>BOARD_SIZE + col) };
     }
+
     <span class="doccomment">/// Unsafely sets a value in the board at the given index
     /// # Arguments
     /// * `row` - Row index of the value to get (must be less than `BOARD_SIZE`)
@@ -1457,7 +1463,7 @@
 /// # Arguments
 /// * `word` - String word to convert
 /// # Returns
-/// `Word` - numeric representation of `word`, with each letter converted from 0 (&#39;A&#39;) to 25 (&#39;Z&#39;)
+/// `Word` - numeric representation of `word`, with each letter converted from 0 ('A') to 25 ('Z')
 /// # See also
 /// `convert_array_to_word`
 </span><span class="kw">fn </span>convert_word_to_array(word: <span class="kw-2">&amp;</span>str) -&gt; Word {
@@ -1468,7 +1474,7 @@
 /// # Arguments
 /// * `arr` - Numeric vector of the word
 /// # Returns
-/// * `String` - `arr` converted into a `String`, with each number converted from &#39;A&#39; (0) to &#39;Z&#39; (25)
+/// * `String` - `arr` converted into a `String`, with each number converted from 'A' (0) to 'Z' (25)
 /// # See also
 /// `convert_word_to_array`
 </span><span class="kw">fn </span>convert_array_to_word(arr: <span class="kw-2">&amp;</span>Word) -&gt; String {
@@ -1489,13 +1495,13 @@
     <span class="kw">for </span>row <span class="kw">in </span>min_row..max_row+<span class="number">1 </span>{
         <span class="kw">for </span>col <span class="kw">in </span>min_col..max_col+<span class="number">1 </span>{
             <span class="kw">if </span>board.get_val(row, col) == EMPTY_VALUE {
-                board_string.push(<span class="string">&#39; &#39;</span>);
+                board_string.push(<span class="string">' '</span>);
             }
             <span class="kw">else </span>{
                 board_string.push((board.get_val(row, col) <span class="kw">as </span>u8+<span class="number">65</span>) <span class="kw">as </span>char);
             }
         }
-        board_string.push(<span class="string">&#39;\n&#39;</span>);
+        board_string.push(<span class="string">'\n'</span>);
     }
     <span class="kw">let </span>s: String = board_string.iter().collect();
     <span class="kw">return </span>s.trim_end().to_owned();
@@ -1516,14 +1522,14 @@
         <span class="kw">let </span><span class="kw-2">mut </span>row_vec: Vec&lt;String&gt; = Vec::with_capacity(max_col-min_col);
         <span class="kw">for </span>col <span class="kw">in </span>min_col..max_col+<span class="number">1 </span>{
             <span class="kw">if </span>board.get_val(row, col) == EMPTY_VALUE {
-                row_vec.push(<span class="string">&#39; &#39;</span>.to_string());
+                row_vec.push(<span class="string">' '</span>.to_string());
             }
             <span class="kw">else </span>{
                 <span class="kw">if </span>!previous_idxs.contains(<span class="kw-2">&amp;</span>(row, col)) {
                     row_vec.push(((board.get_val(row, col) <span class="kw">as </span>u8+<span class="number">65</span>) <span class="kw">as </span>char).to_string());
                 }
                 <span class="kw">else </span>{
-                    row_vec.push(((board.get_val(row, col) <span class="kw">as </span>u8+<span class="number">65</span>) <span class="kw">as </span>char).to_string() + <span class="string">&quot;*&quot;</span>);
+                    row_vec.push(((board.get_val(row, col) <span class="kw">as </span>u8+<span class="number">65</span>) <span class="kw">as </span>char).to_string() + <span class="string">"*"</span>);
                 }
             }
         }
@@ -1598,7 +1604,7 @@
     <span class="kw">let </span><span class="kw-2">mut </span>current_letters: Vec&lt;usize&gt; = Vec::with_capacity(MAX_WORD_LENGTH);
     <span class="comment">// Check across the row where the word was played
     </span><span class="kw">for </span>col_idx <span class="kw">in </span>min_col..max_col+<span class="number">1 </span>{
-        <span class="comment">// If we&#39;re not at an empty square, add it to the current word we&#39;re looking at
+        <span class="comment">// If we're not at an empty square, add it to the current word we're looking at
         </span><span class="kw">if </span>board.get_val(row, col_idx) != EMPTY_VALUE {
             current_letters.push(board.get_val(row, col_idx));
         }
@@ -1657,7 +1663,7 @@
     <span class="kw">let </span><span class="kw-2">mut </span>current_letters: Vec&lt;usize&gt; = Vec::with_capacity(MAX_WORD_LENGTH);
     <span class="comment">// Check down the column where the word was played
     </span><span class="kw">for </span>row_idx <span class="kw">in </span>min_row..max_row+<span class="number">1 </span>{
-        <span class="comment">// If it&#39;s not an empty value, add it to the current word
+        <span class="comment">// If it's not an empty value, add it to the current word
         </span><span class="kw">if </span>board.get_val(row_idx, col) != EMPTY_VALUE {
             current_letters.push(board.get_val(row_idx, col));
         }
@@ -1667,13 +1673,13 @@
                 <span class="kw">return </span><span class="bool-val">false</span>;
             }
             current_letters.clear();
-            <span class="comment">// If we&#39;re past the end of the played word, no need to check farther
+            <span class="comment">// If we're past the end of the played word, no need to check farther
             </span><span class="kw">if </span>row_idx &gt; end_row {
                 <span class="kw">break</span>;
             }
         }
     }
-    <span class="comment">// In case we don&#39;t hit the `else` in the previous loop
+    <span class="comment">// In case we don't hit the `else` in the previous loop
     </span><span class="kw">if </span>current_letters.len() &gt; <span class="number">1 </span>{
         <span class="kw">if </span>!valid_words.contains(<span class="kw-2">&amp;</span>current_letters) {
             <span class="kw">return </span><span class="bool-val">false</span>;
@@ -1716,18 +1722,18 @@
 <span class="kw">impl </span>fmt::Display <span class="kw">for </span>LetterUsage {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
        <span class="kw">match </span><span class="self">self </span>{
-            LetterUsage::Remaining =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;Remaining&quot;</span>),
-            LetterUsage::Overused =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;Overused&quot;</span>),
-            LetterUsage::Finished =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;Finished&quot;</span>)
+            LetterUsage::Remaining =&gt; <span class="macro">write!</span>(f, <span class="string">"Remaining"</span>),
+            LetterUsage::Overused =&gt; <span class="macro">write!</span>(f, <span class="string">"Overused"</span>),
+            LetterUsage::Finished =&gt; <span class="macro">write!</span>(f, <span class="string">"Finished"</span>)
        }
     }
 }
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>LetterUsage {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
         <span class="kw">match </span><span class="self">self </span>{
-             LetterUsage::Remaining =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;Remaining&quot;</span>),
-             LetterUsage::Overused =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;Overused&quot;</span>),
-             LetterUsage::Finished =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;Finished&quot;</span>)
+             LetterUsage::Remaining =&gt; <span class="macro">write!</span>(f, <span class="string">"Remaining"</span>),
+             LetterUsage::Overused =&gt; <span class="macro">write!</span>(f, <span class="string">"Overused"</span>),
+             LetterUsage::Finished =&gt; <span class="macro">write!</span>(f, <span class="string">"Finished"</span>)
         }
      }
 }
@@ -1743,8 +1749,8 @@
 <span class="kw">impl </span>fmt::Display <span class="kw">for </span>Direction {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
        <span class="kw">match </span><span class="self">self </span>{
-            Direction::Vertical =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;Horizontal&quot;</span>),
-            Direction::Horizontal =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;Vertical&quot;</span>)
+            Direction::Vertical =&gt; <span class="macro">write!</span>(f, <span class="string">"Horizontal"</span>),
+            Direction::Horizontal =&gt; <span class="macro">write!</span>(f, <span class="string">"Vertical"</span>)
        }
     }
 }
@@ -1908,13 +1914,13 @@
         <span class="kw">if </span>res.<span class="number">0 </span>{
             <span class="kw">match </span>previous_play_sequence[depth+<span class="number">1</span>].<span class="number">1.2 </span>{
                 Direction::Horizontal =&gt; {
-                    <span class="comment">// If the word was played successfully (i.e. it&#39;s not a complete overlap and it borders at least one existing tile), then check the validity of the new words it forms
+                    <span class="comment">// If the word was played successfully (i.e. it's not a complete overlap and it borders at least one existing tile), then check the validity of the new words it forms
                     </span><span class="kw">let </span>new_min_col = cmp::min(min_col, col_idx);
                     <span class="kw">let </span>new_max_col = cmp::max(max_col, col_idx+word.len());
                     <span class="kw">let </span>new_min_row = cmp::min(min_row, row_idx);
                     <span class="kw">let </span>new_max_row = cmp::max(max_row, row_idx);
                     <span class="kw">if </span>is_board_valid_horizontal(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, col_idx, col_idx+word.len()-<span class="number">1</span>, valid_words_set) {
-                        <span class="comment">// If it&#39;s valid, go to the next recursive level (where completion will be checked)
+                        <span class="comment">// If it's valid, go to the next recursive level (where completion will be checked)
                         </span>play_sequence.push((word.clone(), (res.<span class="number">1</span>[<span class="number">0</span>].<span class="number">0</span>, res.<span class="number">1</span>[<span class="number">0</span>].<span class="number">1</span>, Direction::Horizontal)));
                         <span class="kw">match </span>res.<span class="number">3 </span>{
                             LetterUsage::Finished =&gt; {
@@ -1923,11 +1929,11 @@
                             LetterUsage::Remaining =&gt; {
                                 <span class="kw">let </span>res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, valid_words_vec, valid_words_set, res.<span class="number">2</span>, depth+<span class="number">1</span>, play_sequence, previous_play_sequence, stop_me)<span class="question-mark">?</span>;
                                 <span class="kw">if </span>res2.<span class="number">0 </span>&amp;&amp; !stop_me.load(Ordering::Relaxed) {
-                                    <span class="comment">// If that recursive stack finishes successfully, we&#39;re done! (could have used another Result or Option rather than a bool in the returned tuple, but oh well)
+                                    <span class="comment">// If that recursive stack finishes successfully, we're done! (could have used another Result or Option rather than a bool in the returned tuple, but oh well)
                                     </span><span class="kw">return </span><span class="prelude-val">Ok</span>(res2);
                                 }
                                 <span class="kw">else </span>{
-                                    <span class="comment">// Otherwise, undo the previous play (cloning the board before each play so we don&#39;t have to undo is *way* slower)
+                                    <span class="comment">// Otherwise, undo the previous play (cloning the board before each play so we don't have to undo is *way* slower)
                                     </span>play_sequence.pop();
                                     undo_play(board, <span class="kw-2">&amp;</span>res.<span class="number">1</span>);
                                 }
@@ -1976,10 +1982,10 @@
         }
         <span class="kw">return </span><span class="prelude-val">Ok</span>((<span class="bool-val">false</span>, min_col, max_col, min_row, max_row));
     }
-    <span class="comment">// If we&#39;re at an odd depth, play horizontally first (trying to alternate horizontal-vertical-horizontal as a heuristic to solve faster)
+    <span class="comment">// If we're at an odd depth, play horizontally first (trying to alternate horizontal-vertical-horizontal as a heuristic to solve faster)
     </span><span class="kw">else if </span>depth % <span class="number">2 </span>== <span class="number">1 </span>{
         <span class="kw">for </span>word <span class="kw">in </span>valid_words_vec.iter() {
-            <span class="comment">// Stop if we&#39;re signalled to
+            <span class="comment">// Stop if we're signalled to
             </span><span class="kw">if </span>stop_me.load(Ordering::Relaxed) {
                 <span class="kw">return </span><span class="prelude-val">Err</span>(());
             }
@@ -1990,13 +1996,13 @@
                     <span class="comment">// Using the ? because `play_word` can give an `Err` if the index is out of bounds
                     </span><span class="kw">let </span>res = play_word(word, row_idx, col_idx, board, Direction::Horizontal, <span class="kw-2">&amp;</span>letters)<span class="question-mark">?</span>;
                     <span class="kw">if </span>res.<span class="number">0 </span>{
-                        <span class="comment">// If the word was played successfully (i.e. it&#39;s not a complete overlap and it borders at least one existing tile), then check the validity of the new words it forms
+                        <span class="comment">// If the word was played successfully (i.e. it's not a complete overlap and it borders at least one existing tile), then check the validity of the new words it forms
                         </span><span class="kw">let </span>new_min_col = cmp::min(min_col, col_idx);
                         <span class="kw">let </span>new_max_col = cmp::max(max_col, col_idx+word.len());
                         <span class="kw">let </span>new_min_row = cmp::min(min_row, row_idx);
                         <span class="kw">let </span>new_max_row = cmp::max(max_row, row_idx);
                         <span class="kw">if </span>is_board_valid_horizontal(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, col_idx, col_idx+word.len()-<span class="number">1</span>, valid_words_set) {
-                            <span class="comment">// If it&#39;s valid, go to the next recursive level (unless we&#39;ve all the letters, at which point we&#39;re done)
+                            <span class="comment">// If it's valid, go to the next recursive level (unless we've all the letters, at which point we're done)
                             </span>play_sequence.push((word.clone(), (res.<span class="number">1</span>[<span class="number">0</span>].<span class="number">0</span>, res.<span class="number">1</span>[<span class="number">0</span>].<span class="number">1</span>, Direction::Horizontal)));
                             <span class="kw">match </span>res.<span class="number">3 </span>{
                                 LetterUsage::Finished =&gt; {
@@ -2005,11 +2011,11 @@
                                 LetterUsage::Remaining =&gt; {
                                     <span class="kw">let </span>res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, valid_words_vec, valid_words_set, res.<span class="number">2</span>, depth+<span class="number">1</span>, play_sequence, previous_play_sequence, stop_me)<span class="question-mark">?</span>;
                                     <span class="kw">if </span>res2.<span class="number">0 </span>&amp;&amp; !stop_me.load(Ordering::Relaxed) {
-                                        <span class="comment">// If that recursive stack finishes successfully, we&#39;re done! (could have used another Result or Option rather than a bool in the returned tuple, but oh well)
+                                        <span class="comment">// If that recursive stack finishes successfully, we're done! (could have used another Result or Option rather than a bool in the returned tuple, but oh well)
                                         </span><span class="kw">return </span><span class="prelude-val">Ok</span>(res2);
                                     }
                                     <span class="kw">else </span>{
-                                        <span class="comment">// Otherwise, undo the previous play (cloning the board before each play so we don&#39;t have to undo is *way* slower)
+                                        <span class="comment">// Otherwise, undo the previous play (cloning the board before each play so we don't have to undo is *way* slower)
                                         </span>play_sequence.pop();
                                         undo_play(board, <span class="kw-2">&amp;</span>res.<span class="number">1</span>);
                                     }
@@ -2029,7 +2035,7 @@
                 }
             }
         }
-        <span class="comment">// If trying every word horizontally didn&#39;t work, try vertically instead
+        <span class="comment">// If trying every word horizontally didn't work, try vertically instead
         </span><span class="kw">for </span>word <span class="kw">in </span>valid_words_vec.iter() {
             <span class="kw">if </span>stop_me.load(Ordering::Relaxed) {
                 <span class="kw">return </span><span class="prelude-val">Err</span>(());
@@ -2075,7 +2081,7 @@
         }
         <span class="kw">return </span><span class="prelude-val">Ok</span>((<span class="bool-val">false</span>, min_col, max_col, min_row, max_row));
     }
-    <span class="comment">// If we&#39;re at an even depth, play vertically first. Otherwise this is analgous to the above.
+    <span class="comment">// If we're at an even depth, play vertically first. Otherwise this is analgous to the above.
     </span><span class="kw">else </span>{
         <span class="kw">for </span>word <span class="kw">in </span>valid_words_vec.iter() {
             <span class="kw">if </span>stop_me.load(Ordering::Relaxed) {
@@ -2180,7 +2186,7 @@
     <span class="comment">// Loop through all possible locations and check if the letter works there
     </span><span class="kw">for </span>row <span class="kw">in </span>min_row-<span class="number">1</span>..max_row+<span class="number">2 </span>{
         <span class="kw">for </span>col <span class="kw">in </span>min_col-<span class="number">1</span>..max_col+<span class="number">2 </span>{
-            <span class="kw">if </span>row &lt; BOARD_SIZE &amp;&amp; col &lt; BOARD_SIZE &amp;&amp; board.get_val(row, col) == EMPTY_VALUE {   <span class="comment">// row/col don&#39;t need to be checked if they&#39;re greater than 0 since they&#39;d underflow
+            <span class="kw">if </span>row &lt; BOARD_SIZE &amp;&amp; col &lt; BOARD_SIZE &amp;&amp; board.get_val(row, col) == EMPTY_VALUE {   <span class="comment">// row/col don't need to be checked if they're greater than 0 since they'd underflow
                 </span><span class="kw">if </span>(col &gt; <span class="number">0 </span>&amp;&amp; board.get_val(row, col-<span class="number">1</span>) != EMPTY_VALUE) || (col &lt; BOARD_SIZE-<span class="number">1 </span>&amp;&amp; board.get_val(row, col+<span class="number">1</span>) != EMPTY_VALUE) || (row &gt; <span class="number">0 </span>&amp;&amp; board.get_val(row-<span class="number">1</span>, col) != EMPTY_VALUE) || (row &lt; BOARD_SIZE-<span class="number">1 </span>&amp;&amp; board.get_val(row+<span class="number">1</span>, col) != EMPTY_VALUE) {
                     board.set_val(row, col, letter);
                     <span class="kw">let </span>new_min_col = cmp::min(min_col, col);
@@ -2189,18 +2195,18 @@
                     <span class="kw">let </span>new_max_row = cmp::max(max_row, row);
                     <span class="comment">// Could also use `is_board_valid_vertical`
                     </span><span class="kw">if </span>is_board_valid_horizontal(board, new_min_col, new_max_col, new_min_row, new_max_row, row, col, col, valid_words_set) {
-                        <span class="comment">// If it&#39;s valid, return the (potentially) new bounds, along with the location the letter was played
+                        <span class="comment">// If it's valid, return the (potentially) new bounds, along with the location the letter was played
                         </span><span class="kw">return </span><span class="prelude-val">Some</span>((row, col, new_min_col, new_max_col, new_min_row, new_max_row));
                     }
                     <span class="kw">else </span>{
-                        <span class="comment">// If the board wasn&#39;t ok, reset this spot
+                        <span class="comment">// If the board wasn't ok, reset this spot
                         </span>board.set_val(row, col, EMPTY_VALUE);
                     }
                 }
             }
         }
     }
-    <span class="comment">// Return `None` if we don&#39;t find a solution
+    <span class="comment">// Return `None` if we don't find a solution
     </span><span class="kw">return </span><span class="prelude-val">None</span>;
 }
 
@@ -2319,24 +2325,24 @@
 
 <span class="doccomment">/// Generates random letters based on user input
 /// # Arguments
-/// * `what` - Whether to generate characters from an &quot;infinite set&quot; (i.e. all are equal likelihood),
-/// or selected from &quot;standard Bananagrams&quot; (144 tiles) or &quot;double Bananagrams&quot; (288 tiles)
+/// * `what` - Whether to generate characters from an "infinite set" (i.e. all are equal likelihood),
+/// or selected from "standard Bananagrams" (144 tiles) or "double Bananagrams" (288 tiles)
 /// * `how_many` - How many tiles to randomly generate; must be greater than 0, and less than 144 for regular Bananagrams,
 /// or 288 for double
 /// # Returns
-/// `Result` of mapping of each uppercase Latin character to the number of times it&#39;s present
+/// `Result` of mapping of each uppercase Latin character to the number of times it's present
 /// 
 /// *or String `Err` upon failure*
 </span><span class="attr">#[tauri::command]
-</span><span class="kw">async fn </span>get_random_letters(what: String, how_many: i64, _state: State&lt;<span class="lifetime">&#39;_</span>, AppState&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;HashMap&lt;char, u64&gt;, String&gt; {
+</span><span class="kw">async fn </span>get_random_letters(what: String, how_many: i64, _state: State&lt;<span class="lifetime">'_</span>, AppState&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;HashMap&lt;char, u64&gt;, String&gt; {
     <span class="kw">if </span>how_many &lt; <span class="number">1 </span>{
-        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;The number to choose should be greater than 0&quot;</span>.to_owned());
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">"The number to choose should be greater than 0"</span>.to_owned());
     }
     <span class="kw">let </span><span class="kw-2">mut </span>rng = thread_rng();
     <span class="kw">let </span><span class="kw-2">mut </span>return_chars: HashMap&lt;char, u64&gt; = HashMap::with_capacity(<span class="number">26</span>);
     UPPERCASE.chars().for_each(|c| {return_chars.insert(c, <span class="number">0</span>);});
-    <span class="kw">if </span>what == <span class="string">&quot;infinite set&quot; </span>{
-        <span class="comment">// For &quot;infinite set&quot;, randomly generate characters
+    <span class="kw">if </span>what == <span class="string">"infinite set" </span>{
+        <span class="comment">// For "infinite set", randomly generate characters
         </span><span class="kw">let </span>uni = Uniform::new_inclusive(<span class="number">0</span>, <span class="number">25</span>);
         <span class="kw">for _ in </span><span class="number">0</span>..how_many {
             <span class="kw">let </span>random_num: u8 = uni.sample(<span class="kw-2">&amp;mut </span>rng);
@@ -2347,14 +2353,14 @@
                     return_chars.insert(random_char, v+<span class="number">1</span>);
                 },
                 <span class="prelude-val">None </span>=&gt; {
-                    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">&quot;Missing value in return dictionary: {}&quot;</span>, random_char));
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">"Missing value in return dictionary: {}"</span>, random_char));
                 }
             }
         }
     }
-    <span class="kw">else if </span>what == <span class="string">&quot;standard Bananagrams&quot; </span>{
+    <span class="kw">else if </span>what == <span class="string">"standard Bananagrams" </span>{
         <span class="kw">if </span>how_many &gt; <span class="number">144 </span>{
-            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;The number to choose must be less than 144 for standard Banangrams&quot;</span>.to_owned());
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">"The number to choose must be less than 144 for standard Banangrams"</span>.to_owned());
         }
         <span class="comment">// For regular Bananagrams, first make the vector of characters to choose form
         </span><span class="kw">let </span><span class="kw-2">mut </span>to_choose_from: Vec&lt;char&gt; = Vec::with_capacity(<span class="number">144</span>);
@@ -2372,15 +2378,15 @@
                     return_chars.insert(selected_chars[i], v+<span class="number">1</span>);
                 },
                 <span class="prelude-val">None </span>=&gt; {
-                    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">&quot;Missing value in return dictionary: {}&quot;</span>, selected_chars[i]));
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">"Missing value in return dictionary: {}"</span>, selected_chars[i]));
                 }
             }
         }
     }
-    <span class="kw">else if </span>what == <span class="string">&quot;double Bananagrams&quot; </span>{
-        <span class="comment">// &quot;double Bananagrams&quot; is just like regular, except with twice as many pieces
+    <span class="kw">else if </span>what == <span class="string">"double Bananagrams" </span>{
+        <span class="comment">// "double Bananagrams" is just like regular, except with twice as many pieces
         </span><span class="kw">if </span>how_many &gt; <span class="number">288 </span>{
-            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;The number to choose must be less than 288 for double Banangrams&quot;</span>.to_owned());
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">"The number to choose must be less than 288 for double Banangrams"</span>.to_owned());
         }
         <span class="kw">let </span><span class="kw-2">mut </span>to_choose_from: Vec&lt;char&gt; = Vec::with_capacity(<span class="number">288</span>);
         <span class="kw">for </span>(i, c) <span class="kw">in </span>UPPERCASE.chars().enumerate() {
@@ -2396,13 +2402,13 @@
                     return_chars.insert(selected_chars[i], v+<span class="number">1</span>);
                 },
                 <span class="prelude-val">None </span>=&gt; {
-                    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">&quot;Missing value in return dictionary: {}&quot;</span>, selected_chars[i]));
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">"Missing value in return dictionary: {}"</span>, selected_chars[i]));
                 }
             }
         }
     }
     <span class="kw">else </span>{
-        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">&quot;`what` must be \&quot;infinite set\&quot;, \&quot;standard Bananagrams\&quot;, or \&quot;double Bananagrams\&quot;, not {}&quot;</span>, what))
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">"`what` must be \"infinite set\", \"standard Bananagrams\", or \"double Bananagrams\", not {}"</span>, what))
     }
     <span class="kw">return </span><span class="prelude-val">Ok</span>(return_chars);
 }
@@ -2412,11 +2418,11 @@
 /// * `available_letters` - `HashMap` (from JavaScript object) mapping string letters to numeric quanity of each letter
 /// * `state` - Current state of the app
 /// # Returns
-/// `Result` of `PlayableWords` with two keys - &quot;short&quot; (common words playable using `available_letters`) and &quot;long&quot; (Scrabble words playable using `available_letters`)
+/// `Result` of `PlayableWords` with two keys - "short" (common words playable using `available_letters`) and "long" (Scrabble words playable using `available_letters`)
 /// 
 /// *or String `Err` upon failure*
 </span><span class="attr">#[tauri::command]
-</span><span class="kw">async fn </span>get_playable_words(available_letters: HashMap&lt;String, i64&gt;, state: State&lt;<span class="lifetime">&#39;_</span>, AppState&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;PlayableWords, String&gt; {
+</span><span class="kw">async fn </span>get_playable_words(available_letters: HashMap&lt;String, i64&gt;, state: State&lt;<span class="lifetime">'_</span>, AppState&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;PlayableWords, String&gt; {
     <span class="comment">// Check if we have all the letters from the frontend
     </span><span class="kw">let </span><span class="kw-2">mut </span>letters = [<span class="number">0usize</span>; <span class="number">26</span>];
     <span class="kw">for </span>c <span class="kw">in </span>UPPERCASE.chars() {
@@ -2424,12 +2430,12 @@
         <span class="kw">match </span>num {
             <span class="prelude-val">Some</span>(number) =&gt; {
                 <span class="kw">if </span><span class="kw-2">*</span>number &lt; <span class="number">0 </span>{
-                    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">&quot;Number of letter {} is {}, but must be greater than or equal to 0!&quot;</span>, c, number));
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">"Number of letter {} is {}, but must be greater than or equal to 0!"</span>, c, number));
                 }
                 letters[(c <span class="kw">as </span>usize) - <span class="number">65</span>] = <span class="kw-2">*</span>number <span class="kw">as </span>usize;
             },
             <span class="prelude-val">None </span>=&gt; {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">&quot;Missing letter: {}&quot;</span>, c));
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">"Missing letter: {}"</span>, c));
             }
         }
     }
@@ -2446,8 +2452,8 @@
 /// 
 /// *or empty `Err` if out-of-bounds*
 </span><span class="attr">#[tauri::command]
-</span><span class="kw">async fn </span>reset(state: State&lt;<span class="lifetime">&#39;_</span>, AppState&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), String&gt; {
-    <span class="kw">let </span><span class="kw-2">mut </span>last_game_state = state.last_game.lock().or(<span class="prelude-val">Err</span>(<span class="string">&quot;Failed to get lock on the last game state&quot;</span>))<span class="question-mark">?</span>;
+</span><span class="kw">async fn </span>reset(state: State&lt;<span class="lifetime">'_</span>, AppState&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), String&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>last_game_state = state.last_game.lock().or(<span class="prelude-val">Err</span>(<span class="string">"Failed to get lock on the last game state"</span>))<span class="question-mark">?</span>;
     <span class="kw-2">*</span>last_game_state = <span class="prelude-val">None</span>;
     <span class="prelude-val">Ok</span>(())
 }
@@ -2461,7 +2467,7 @@
 /// 
 /// *or String `Err` upon failure or not finding a tile (with the reason indicated in the String)*
 </span><span class="attr">#[tauri::command]
-</span><span class="kw">async fn </span>play_bananagrams(available_letters: HashMap&lt;String, i64&gt;, state: State&lt;<span class="lifetime">&#39;_</span>, AppState&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Solution, String&gt; {
+</span><span class="kw">async fn </span>play_bananagrams(available_letters: HashMap&lt;String, i64&gt;, state: State&lt;<span class="lifetime">'_</span>, AppState&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Solution, String&gt; {
     <span class="kw">let </span>now = Instant::now();
     <span class="comment">// Check if we have all the letters from the frontend
     </span><span class="kw">let </span><span class="kw-2">mut </span>letters = [<span class="number">0usize</span>; <span class="number">26</span>];
@@ -2470,27 +2476,27 @@
         <span class="kw">match </span>num {
             <span class="prelude-val">Some</span>(number) =&gt; {
                 <span class="kw">if </span><span class="kw-2">*</span>number &lt; <span class="number">0 </span>{
-                    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">&quot;Number of letter {} is {}, but must be greater than or equal to 0!&quot;</span>, c, number));
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">"Number of letter {} is {}, but must be greater than or equal to 0!"</span>, c, number));
                 }
                 letters[(c <span class="kw">as </span>usize) - <span class="number">65</span>] = <span class="kw-2">*</span>number <span class="kw">as </span>usize;
             },
             <span class="prelude-val">None </span>=&gt; {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">&quot;Missing letter: {}&quot;</span>, c));
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">"Missing letter: {}"</span>, c));
             }
         }
     }
     <span class="comment">// Check whether a board has been played already
-    </span><span class="kw">let </span><span class="kw-2">mut </span>last_game_state: std::sync::MutexGuard&lt;<span class="lifetime">&#39;_</span>, <span class="prelude-ty">Option</span>&lt;GameState&gt;&gt;;
+    </span><span class="kw">let </span><span class="kw-2">mut </span>last_game_state: std::sync::MutexGuard&lt;<span class="lifetime">'_</span>, <span class="prelude-ty">Option</span>&lt;GameState&gt;&gt;;
     <span class="kw">match </span>state.last_game.lock() {
         <span class="prelude-val">Ok</span>(locked) =&gt; {
             last_game_state = locked;
         },
         <span class="kw">_ </span>=&gt; {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Failed to get lock on last game state&quot;</span>.to_owned());
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">"Failed to get lock on last game state"</span>.to_owned());
         }
     }
     <span class="kw">let </span><span class="kw-2">mut </span>previous_play_sequence: <span class="prelude-ty">Option</span>&lt;PlaySequence&gt; = <span class="prelude-val">None</span>;
-    <span class="kw">match </span><span class="kw-2">&amp;*</span>last_game_state {   <span class="comment">// I don&#39;t like &amp;*
+    <span class="kw">match </span><span class="kw-2">&amp;*</span>last_game_state {   <span class="comment">// I don't like &amp;*
         </span><span class="prelude-val">Some</span>(prev_state) =&gt; {
             previous_play_sequence = <span class="prelude-val">Some</span>(prev_state.play_sequence.clone());
             <span class="comment">// If a board has been played, check whether the letters are the same as before, or if some are more or less
@@ -2566,7 +2572,7 @@
     // Get a vector of all valid words
     </span><span class="kw">let </span>valid_words_vec: Vec&lt;Word&gt; = state.all_words_short.iter().filter(|word| is_makeable(word, letters)).map(|word| word.clone()).collect();
     <span class="kw">if </span>valid_words_vec.len() == <span class="number">0 </span>{
-        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;No valid words can be formed from the current letters - dump and try again!&quot;</span>.to_owned());
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">"No valid words can be formed from the current letters - dump and try again!"</span>.to_owned());
     }
     <span class="comment">// Split the words to check up into appropriate chunks based on the available parallelism
     </span><span class="kw">let </span><span class="kw-2">mut </span>default_parallelism_approx = <span class="number">1usize</span>;
@@ -2611,8 +2617,8 @@
                 <span class="kw">if </span>use_letters.iter().all(|count| <span class="kw-2">*</span>count == <span class="number">0</span>) {
                     <span class="kw">if </span>!stop_t.load(Ordering::Relaxed) {
                         stop_t.store(<span class="bool-val">true</span>, Ordering::Relaxed);
-                        <span class="comment">// The expect may panic the thread but I think that&#39;s ok
-                        </span><span class="kw">let </span><span class="kw-2">mut </span>ret = conn.lock().expect(<span class="string">&quot;Failed to get lock on shared ret_val&quot;</span>);
+                        <span class="comment">// The expect may panic the thread but I think that's ok
+                        </span><span class="kw">let </span><span class="kw-2">mut </span>ret = conn.lock().expect(<span class="string">"Failed to get lock on shared ret_val"</span>);
                         <span class="kw">let </span>previous_idxs: HashSet&lt;(usize, usize)&gt;;
                         <span class="kw">match </span>copied_previous_play_sequence {
                             <span class="prelude-val">Some</span>(prev) =&gt; {
@@ -2632,12 +2638,12 @@
                     <span class="comment">// Begin the recursive processing
                     </span><span class="kw">let </span>result = play_further(<span class="kw-2">&amp;mut </span>board, min_col, max_col, min_row, max_row, <span class="kw-2">&amp;</span>new_valid_words_vec, <span class="kw-2">&amp;</span>valid_words_set, use_letters, <span class="number">0</span>, <span class="kw-2">&amp;mut </span>play_sequence, <span class="kw-2">&amp;</span>Vec::new(), <span class="kw-2">&amp;</span>stop_t);
                     <span class="kw">match </span>result {
-                        <span class="comment">// If the result was good, then store it and signal other threads to finish (so long as another thread isn&#39;t doing so)
+                        <span class="comment">// If the result was good, then store it and signal other threads to finish (so long as another thread isn't doing so)
                         </span><span class="prelude-val">Ok</span>(res) =&gt; {
                             <span class="kw">if </span>res.<span class="number">0 </span>&amp;&amp; !stop_t.load(Ordering::Relaxed) {
                                 stop_t.store(<span class="bool-val">true</span>, Ordering::Relaxed);
-                                <span class="comment">// The expect will panic the thread but I think that&#39;s ok
-                                </span><span class="kw">let </span><span class="kw-2">mut </span>ret = conn.lock().expect(<span class="string">&quot;Failed to get lock on shared ret_val&quot;</span>);
+                                <span class="comment">// The expect will panic the thread but I think that's ok
+                                </span><span class="kw">let </span><span class="kw-2">mut </span>ret = conn.lock().expect(<span class="string">"Failed to get lock on shared ret_val"</span>);
                                 <span class="kw">let </span>previous_idxs: HashSet&lt;(usize, usize)&gt;;
                                 <span class="kw">match </span>copied_previous_play_sequence {
                                     <span class="prelude-val">Some</span>(prev) =&gt; {
@@ -2649,7 +2655,7 @@
                                 <span class="kw">break</span>;
                             }
                         },
-                        <span class="comment">// If an error (we&#39;re out of bounds or another thread signalled to stop) then we&#39;re done
+                        <span class="comment">// If an error (we're out of bounds or another thread signalled to stop) then we're done
                         </span><span class="prelude-val">Err</span>(()) =&gt; {
                             <span class="kw">break</span>;
                         }
@@ -2663,14 +2669,14 @@
     </span><span class="kw">for </span>handle <span class="kw">in </span>handles.into_iter() {
         <span class="kw">let </span>_res = handle.join();
     }
-    <span class="comment">// If we&#39;re done, store the result in the `State` and return the result to the frontend
-    </span><span class="kw">let </span>ret: std::sync::MutexGuard&lt;<span class="lifetime">&#39;_</span>, Vec&lt;(Vec&lt;Vec&lt;String&gt;&gt;, Board, usize, usize, usize, usize, Vec&lt;(Vec&lt;usize&gt;, (usize, usize, Direction))&gt;)&gt;&gt;;
+    <span class="comment">// If we're done, store the result in the `State` and return the result to the frontend
+    </span><span class="kw">let </span>ret: std::sync::MutexGuard&lt;<span class="lifetime">'_</span>, Vec&lt;(Vec&lt;Vec&lt;String&gt;&gt;, Board, usize, usize, usize, usize, Vec&lt;(Vec&lt;usize&gt;, (usize, usize, Direction))&gt;)&gt;&gt;;
     <span class="kw">match </span>ret_val.lock() {
         <span class="prelude-val">Ok</span>(locked) =&gt; {
             ret = locked;
         },
         <span class="kw">_ </span>=&gt; {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Failed to get lock on shared ret_val when checking return&quot;</span>.to_owned());
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">"Failed to get lock on shared ret_val when checking return"</span>.to_owned());
         }
     }
     <span class="kw">if </span>ret.len() &gt; <span class="number">0 </span>{
@@ -2680,7 +2686,7 @@
     <span class="comment">// Try again with all words in the Scrabble dictionary; this could potentially take much longer but is done just to be exhaustive
     </span><span class="kw">let </span>valid_words_vec: Vec&lt;Word&gt; = state.all_words_long.iter().filter(|word| is_makeable(word, letters)).map(|word| word.clone()).collect();
     <span class="kw">if </span>valid_words_vec.len() == <span class="number">0 </span>{
-        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;No valid words can be formed from the current letters - dump and try again!&quot;</span>.to_owned());
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">"No valid words can be formed from the current letters - dump and try again!"</span>.to_owned());
     }
     <span class="kw">let </span>chunks: Vec&lt;Vec&lt;Word&gt;&gt; = valid_words_vec.chunks(chunk_size.ceil() <span class="kw">as </span>usize).map(|words| words.to_vec()).collect();
     <span class="kw">let </span>stop = Arc::new(AtomicBool::new(<span class="bool-val">false</span>));
@@ -2712,8 +2718,8 @@
                 <span class="kw">if </span>use_letters.iter().all(|count| <span class="kw-2">*</span>count == <span class="number">0</span>) {
                     <span class="kw">if </span>!stop_t.load(Ordering::Relaxed) {
                         stop_t.store(<span class="bool-val">true</span>, Ordering::Relaxed);
-                        <span class="comment">// The expect may panic the thread but I think that&#39;s ok
-                        </span><span class="kw">let </span><span class="kw-2">mut </span>ret = conn.lock().expect(<span class="string">&quot;Failed to get lock on shared ret_val&quot;</span>);
+                        <span class="comment">// The expect may panic the thread but I think that's ok
+                        </span><span class="kw">let </span><span class="kw-2">mut </span>ret = conn.lock().expect(<span class="string">"Failed to get lock on shared ret_val"</span>);
                         <span class="kw">let </span>previous_idxs: HashSet&lt;(usize, usize)&gt;;
                         <span class="kw">match </span>copied_previous_play_sequence {
                             <span class="prelude-val">Some</span>(prev) =&gt; {
@@ -2734,8 +2740,8 @@
                         <span class="prelude-val">Ok</span>(res) =&gt; {
                             <span class="kw">if </span>res.<span class="number">0 </span>&amp;&amp; !stop_t.load(Ordering::Relaxed) {
                                 stop_t.store(<span class="bool-val">true</span>, Ordering::Relaxed);
-                                <span class="comment">// The expect will panic the thread but I think that&#39;s ok
-                                </span><span class="kw">let </span><span class="kw-2">mut </span>ret = conn.lock().expect(<span class="string">&quot;Failed to get lock on shared ret_val&quot;</span>);
+                                <span class="comment">// The expect will panic the thread but I think that's ok
+                                </span><span class="kw">let </span><span class="kw-2">mut </span>ret = conn.lock().expect(<span class="string">"Failed to get lock on shared ret_val"</span>);
                                 <span class="kw">let </span>previous_idxs: HashSet&lt;(usize, usize)&gt;;
                                 <span class="kw">match </span>copied_previous_play_sequence {
                                     <span class="prelude-val">Some</span>(prev) =&gt; {
@@ -2759,29 +2765,29 @@
     <span class="kw">for </span>handle <span class="kw">in </span>handles.into_iter() {
         <span class="kw">let </span>_res = handle.join();
     }
-    <span class="kw">let </span>ret_long: std::sync::MutexGuard&lt;<span class="lifetime">&#39;_</span>, Vec&lt;(Vec&lt;Vec&lt;String&gt;&gt;, Board, usize, usize, usize, usize, Vec&lt;(Vec&lt;usize&gt;, (usize, usize, Direction))&gt;)&gt;&gt;;
+    <span class="kw">let </span>ret_long: std::sync::MutexGuard&lt;<span class="lifetime">'_</span>, Vec&lt;(Vec&lt;Vec&lt;String&gt;&gt;, Board, usize, usize, usize, usize, Vec&lt;(Vec&lt;usize&gt;, (usize, usize, Direction))&gt;)&gt;&gt;;
     <span class="kw">match </span>ret_val.lock() {
         <span class="prelude-val">Ok</span>(locked) =&gt; {
             ret_long = locked;
         },
         <span class="kw">_ </span>=&gt; {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Failed to get lock on shared ret_val when checking return&quot;</span>.to_owned());
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">"Failed to get lock on shared ret_val when checking return"</span>.to_owned());
         }
     }
     <span class="kw">if </span>ret_long.len() &gt; <span class="number">0 </span>{
         <span class="kw-2">*</span>last_game_state = <span class="prelude-val">Some</span>(GameState { board: ret_long[<span class="number">0</span>].<span class="number">1</span>.clone(), min_col: ret_long[<span class="number">0</span>].<span class="number">2</span>, max_col: ret_long[<span class="number">0</span>].<span class="number">3</span>, min_row: ret_long[<span class="number">0</span>].<span class="number">4</span>, max_row: ret_long[<span class="number">0</span>].<span class="number">5</span>, letters, play_sequence: ret_long[<span class="number">0</span>].<span class="number">6</span>.clone() });
         <span class="kw">return </span><span class="prelude-val">Ok</span>(Solution { board: ret_long[<span class="number">0</span>].<span class="number">0</span>.clone(), elapsed: now.elapsed().as_millis() });
     }
-    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;No solution found - dump and try again!&quot;</span>.to_owned());
+    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">"No solution found - dump and try again!"</span>.to_owned());
 }
 
 <span class="kw">fn </span>main() {
-    <span class="kw">let </span>all_words_short: Vec&lt;Word&gt; = <span class="macro">include_str!</span>(<span class="string">&quot;short_dictionary.txt&quot;</span>).lines().map(convert_word_to_array).collect();
-    <span class="kw">let </span>all_words_long: Vec&lt;Word&gt; = <span class="macro">include_str!</span>(<span class="string">&quot;dictionary.txt&quot;</span>).lines().map(convert_word_to_array).collect();
+    <span class="kw">let </span>all_words_short: Vec&lt;Word&gt; = <span class="macro">include_str!</span>(<span class="string">"short_dictionary.txt"</span>).lines().map(convert_word_to_array).collect();
+    <span class="kw">let </span>all_words_long: Vec&lt;Word&gt; = <span class="macro">include_str!</span>(<span class="string">"dictionary.txt"</span>).lines().map(convert_word_to_array).collect();
     tauri::Builder::default()
         .manage(AppState { all_words_short, all_words_long, last_game: <span class="prelude-val">None</span>.into() })
         .invoke_handler(<span class="macro">tauri::generate_handler!</span>[play_bananagrams, reset, get_playable_words, get_random_letters])
         .run(<span class="macro">tauri::generate_context!</span>())
-        .expect(<span class="string">&quot;error while running tauri application&quot;</span>);
+        .expect(<span class="string">"error while running tauri application"</span>);
 }
 </code></pre></div></section></main></body></html>
