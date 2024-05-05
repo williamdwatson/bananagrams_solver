@@ -60,6 +60,3 @@ A heuristic is used when only a single additional letter is added to the previou
 
 ## Future enhancements
 More clever strategies should be able to reduce the processing time, as could heuristics to optionally remove the exhausive nature of the alogrithm. In addition, when playing off an existing board, removing individual words and then reprocessing with the slightly reduced board could greatly increase overlap between the previous solution and the new solution (as it stands, if one letter is added but can't fit anywhere in the board, an entirely different solution might be produced).
-
-## Future enhancements
-More clever strategies should be able to reduce the processing time, as could heuristics to optionally remove the exhausive nature of the alogrithm. In addition, when playing off an existing board, removing individual words and then reprocessing with the slightly reduced board could greatly increase overlap between the previous solution and the new solution (as it stands, if one letter is added but can't fit anywhere in the board, an entirely different solution might be produced).
