@@ -17,6 +17,8 @@ The simplest way to run is to download one of the prebuilt installers under the 
 Run `npm run tauri dev` to launch the program in development mode (with code watching/hot reloading); run `npm run tauri build` to compile the standalone program/installer in release mode.
 ### Documentation
 Code documentation can be found [here](https://williamdwatson.github.io/bananagrams_solver/doc/bananagrams_solver/index.html).
+### Browser deployment
+A purely in-browser version can be found [here](https://williamdwatson.github.io/bananagrams_solver_web/). Note that this is usually much slower than the Rust version.
 
 ## Performance
 For performance metrics, a random selection of _n_ letters was taken from the set of standard Bananagrams letters (of which there are 144 in total, so when _n_=144 all letters are being used). Overall, as the hand size (number of letters) increases, the time taken to find a solution increases while the board density decreases. However, this can vary dramatically depending on which letters were randomly chosen.
@@ -60,3 +62,5 @@ A heuristic is used when only a single additional letter is added to the previou
 
 ## Future enhancements
 More clever strategies should be able to reduce the processing time, as could heuristics to optionally remove the exhausive nature of the alogrithm. In addition, when playing off an existing board, removing individual words and then reprocessing with the slightly reduced board could greatly increase overlap between the previous solution and the new solution (as it stands, if one letter is added but can't fit anywhere in the board, an entirely different solution might be produced).
+
+The performance of the browser-only version could likely be enhanced by using [wasm-pack](https://github.com/rustwasm/wasm-pack) to convert portions of the Rust code to WebAssembly.
