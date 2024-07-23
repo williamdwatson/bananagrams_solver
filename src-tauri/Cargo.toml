@@ -1,6 +1,6 @@
 [package]
 name = "bananagrams_solver"
-version = "1.4.0"
+version = "1.5.0"
 description = "A basic Bananagrams solver"
 authors = ["William Watson"]
 license = ""
@@ -25,7 +25,7 @@ hashbrown = "0.14.0"
 custom-protocol = ["tauri/custom-protocol"]
 
 [profile.dev]
-opt-level = 0
+opt-level = 1
 
 [profile.release]
 opt-level = 3
