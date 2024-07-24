@@ -94,8 +94,8 @@ fn convert_array_to_word(arr: &Word) -> String {
 /// * `String` - `board` in string form (with all numbers converted to letters)
 fn _board_to_string(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize) -> String {
     let mut board_string: Vec<char> = Vec::with_capacity((max_row-min_row)*(max_col-min_col));
-    for row in min_row..max_row+1 {
-        for col in min_col..max_col+1 {
+    for row in min_row..=max_row {
+        for col in min_col..=max_col {
             if board.get_val(row, col) == EMPTY_VALUE {
                 board_string.push(' ');
             }
@@ -120,9 +120,9 @@ fn _board_to_string(board: &Board, min_col: usize, max_col: usize, min_row: usiz
 /// * `Vec<Vec<char>>` - `board` in vector form (with all numbers converted to letters)
 fn board_to_vec(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, previous_idxs: &HashSet<(usize, usize)>) -> Vec<Vec<String>> {
     let mut board_vec: Vec<Vec<String>> = Vec::with_capacity(max_row-min_row);
-    for row in min_row..max_row+1 {
+    for row in min_row..=max_row {
         let mut row_vec: Vec<String> = Vec::with_capacity(max_col-min_col);
-        for col in min_col..max_col+1 {
+        for col in min_col..=max_col {
             if board.get_val(row, col) == EMPTY_VALUE {
                 row_vec.push(' '.to_string());
             }
@@ -186,7 +186,7 @@ fn get_new_min_max(board: &Board, old_min_col: usize, old_max_col: usize, old_mi
     }
     // Start at the old minimum row and check if that row or any subsequent ones have any non-empty values
     let mut min_row = old_min_row;
-    for row in old_min_row..old_max_row+1 {
+    for row in old_min_row..=old_max_row {
         if (old_min_col..old_max_col).any(|col| !except_idxs.contains(&(row, col)) && board.get_val(row, col) != EMPTY_VALUE) {
             break;
         }
@@ -202,7 +202,7 @@ fn get_new_min_max(board: &Board, old_min_col: usize, old_max_col: usize, old_mi
     }
     // Now do down columns
     let mut min_col = old_min_col;
-    for col in old_min_col..old_max_col+1 {
+    for col in old_min_col..=old_max_col {
         if (min_row..max_row).any(|row| !except_idxs.contains(&(row, col)) && board.get_val(row, col) != EMPTY_VALUE) {
             break;
         }
@@ -234,9 +234,9 @@ fn get_removable_indices(board: &Board, min_col: usize, max_col: usize, min_row:
     let mut removable: Vec<(Vec<(usize, usize)>, usize, usize, usize, usize)> = Vec::with_capacity((max_col - min_col) + (max_row - min_row));
     let mut board_empty = true;
     // First get horizontal removable word parts
-    for row in min_row..max_row+1 {
+    for row in min_row..=max_row {
         let mut current_word_part: Vec<(usize, usize)> = Vec::with_capacity(max_col-min_col);
-        for col in min_col..max_col+1 {
+        for col in min_col..=max_col {
             if board.get_val(row, col) != EMPTY_VALUE && !((row != 0 && board.get_val(row-1, col) != EMPTY_VALUE) || (row != BOARD_SIZE-1 && board.get_val(row+1, col) != EMPTY_VALUE)) {
                 current_word_part.push((row, col));
             }
@@ -261,9 +261,9 @@ fn get_removable_indices(board: &Board, min_col: usize, max_col: usize, min_row:
         return Vec::new();
     }
     // Then get vertical removable word parts
-    for col in min_col..max_col+1 {
+    for col in min_col..=max_col {
         let mut current_word_part: Vec<(usize, usize)> = Vec::with_capacity(max_col-min_col);
-        for row in min_row..max_row+1 {
+        for row in min_row..=max_row {
             if board.get_val(row, col) != EMPTY_VALUE && !((col != 0 && board.get_val(row, col-1) != EMPTY_VALUE) || (col != BOARD_SIZE-1 && board.get_val(row, col+1) != EMPTY_VALUE)) {
                 current_word_part.push((row, col));
             }
@@ -333,7 +333,7 @@ fn is_board_valid_horizontal(board: &Board, min_col: usize, max_col: usize, min_
     }
     minimum_col = cmp::max(minimum_col, min_col);
     // Check across the row where the word was played
-    for col_idx in minimum_col..max_col+1 {
+    for col_idx in minimum_col..=max_col {
         // If we're not at an empty square, add it to the current word we're looking at
         if board.get_val(row, col_idx) != EMPTY_VALUE {
             current_letters.push(board.get_val(row, col_idx));
@@ -353,7 +353,7 @@ fn is_board_valid_horizontal(board: &Board, min_col: usize, max_col: usize, min_
         return false;
     }
     // Check down each column where a letter was played
-    for col_idx in start_col..end_col+1 {
+    for col_idx in start_col..=end_col {
         current_letters.clear();
         // Find the furtherest up row that the word is connected to
         let mut minimum_row = row;
@@ -365,7 +365,7 @@ fn is_board_valid_horizontal(board: &Board, min_col: usize, max_col: usize, min_
             minimum_row -= 1;
         }
         minimum_row = cmp::max(minimum_row, min_row);
-        for row_idx in minimum_row..max_row+1 {
+        for row_idx in minimum_row..=max_row {
             if board.get_val(row_idx, col_idx) != EMPTY_VALUE {
                 current_letters.push(board.get_val(row_idx, col_idx));
             }
@@ -413,7 +413,7 @@ fn is_board_valid_vertical(board: &Board, min_col: usize, max_col: usize, min_ro
     }
     minimum_row = cmp::max(minimum_row, min_row);
     // Check down the column where the word was played
-    for row_idx in minimum_row..max_row+1 {
+    for row_idx in minimum_row..=max_row {
         // If it's not an empty value, add it to the current word
         if board.get_val(row_idx, col) != EMPTY_VALUE {
             current_letters.push(board.get_val(row_idx, col));
@@ -437,7 +437,7 @@ fn is_board_valid_vertical(board: &Board, min_col: usize, max_col: usize, min_ro
         }
     }
     // Check across each row where a letter was played
-    for row_idx in start_row..end_row+1 {
+    for row_idx in start_row..=end_row {
         current_letters.clear();
         // Find the furtherest left column that the word is connected to
         let mut minimum_col = col;
@@ -449,7 +449,7 @@ fn is_board_valid_vertical(board: &Board, min_col: usize, max_col: usize, min_ro
             minimum_col -= 1;
         }
         minimum_col = cmp::max(minimum_col, min_col);
-        for col_idx in minimum_col..max_col+1 {
+        for col_idx in minimum_col..=max_col {
             if board.get_val(row_idx, col_idx) != EMPTY_VALUE {
                 current_letters.push(board.get_val(row_idx, col_idx));
             }
@@ -971,8 +971,8 @@ fn play_existing(old_board: &Board, min_col: usize, max_col: usize, min_row: usi
     let mut hand_letters = letters.clone();
     let mut old_letters_on_board = [0usize; 26];
     let mut played_on_board: HashSet<usize> = HashSet::new();
-    for row in min_row..max_row+1 {
-        for col in min_col..max_col+1 {
+    for row in min_row..=max_row {
+        for col in min_col..=max_col {
             if old_board.get_val(row, col) != EMPTY_VALUE {
                 hand_letters[old_board.get_val(row, col)] -= 1;
                 old_letters_on_board[old_board.get_val(row, col)] += 1;
@@ -980,7 +980,7 @@ fn play_existing(old_board: &Board, min_col: usize, max_col: usize, min_row: usi
             }
         }
     }
-    let valid_words_vec: Vec<&Word> = dict_to_use.iter().filter(|w| check_filter_after_play(hand_letters, w, &played_on_board)).collect();
+    let valid_words_vec: Vec<Word> = dict_to_use.iter().filter(|w| check_filter_after_play(hand_letters, w, &played_on_board)).map(|w| w.clone()).collect();
     if valid_words_vec.len() == 0 {
         return None;
     }
@@ -993,7 +993,10 @@ fn play_existing(old_board: &Board, min_col: usize, max_col: usize, min_row: usi
         _ => {}
     }
     let chunk_size = (valid_words_vec.len() as f32)/(default_parallelism_approx as f32);
-    let chunks: Vec<Vec<&Word>> = valid_words_vec.chunks(chunk_size.ceil() as usize).map(|words| words.to_vec()).collect();
+    let mut chunks: Vec<Vec<Word>> = vec![Vec::with_capacity(chunk_size.ceil() as usize); default_parallelism_approx];
+    for (i, word) in valid_words_vec.iter().enumerate() {
+        chunks[i % default_parallelism_approx].push(word.to_vec());
+    }
     // Prepare for threading/early termination using `AtomicBool`
     let stop = Arc::new(AtomicBool::new(false));
     let mut handles: Vec<thread::JoinHandle<()>> = Vec::with_capacity(chunks.len());
@@ -1001,7 +1004,7 @@ fn play_existing(old_board: &Board, min_col: usize, max_col: usize, min_row: usi
     let ret_val = Arc::new(Mutex::new(char_vec));
     // For each thread (i.e. piece of available parallelism), spawn a new thread to check those words
     // These threads check different sets of initial words in the board, and whichever finishes first signals the others to stop
-    for chunk in chunks.into_iter() {
+    for chunk in chunks {
         let stop_t = stop.clone();
         let new_letters = hand_letters.clone();
         let copied_new_valid_words_vec = valid_words_vec.clone();
@@ -1010,18 +1013,16 @@ fn play_existing(old_board: &Board, min_col: usize, max_col: usize, min_row: usi
         let board_cloned = old_board.clone();
         let letters_on_board = old_letters_on_board.clone();
         let handle = thread::spawn(move || {
-            let mut tried_words: HashSet<&Word> = HashSet::new();
             // Loop through each word and play it on a new board
             let mut words_checked = 0;
             for word in chunk.iter() {
                 let mut board = board_cloned.clone();
-                let r = try_play_word_horizontal(&mut board, word, min_col, max_col, min_row, max_row, &copied_new_valid_words_vec, &copied_valid_words_set, new_letters, 0, &mut words_checked, &mut letters_on_board.clone(), filter_letters_on_board, max_words_to_check, &stop_t);
+                let r = try_play_word_horizontal(&mut board, word, min_col, max_col, min_row, max_row, &copied_new_valid_words_vec.iter().collect(), &copied_valid_words_set, new_letters, 0, &mut words_checked, &mut letters_on_board.clone(), filter_letters_on_board, max_words_to_check, &stop_t);
                 match r {
                     Ok(rr) => {
                         if let Some(rrr) = rr {
                             if rrr.0 && !stop_t.load(Ordering::Relaxed) {
                                 stop_t.store(true, Ordering::Relaxed);
-                                let previous_idxs: HashSet<(usize, usize)> = get_board_overlap(&board_cloned, &board, min_col, max_col, min_row, max_row, rrr.1, rrr.2, rrr.3, rrr.4);
                                 // The expect may panic the thread but I think that's ok
                                 let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
                                 ret.push((board.clone(), min_col, max_col, min_row, max_row));
@@ -1036,12 +1037,14 @@ fn play_existing(old_board: &Board, min_col: usize, max_col: usize, min_row: usi
         handles.push(handle);
     }
     // Wait for all the threads
-    for handle in handles.into_iter() {
+    for handle in handles {
         let _res = handle.join();
     }
     // If we're done, store the result in the `State` and return the result to the frontend
     let ret = ret_val.lock().expect("Failed to get lock on shared ret_val when checking return");
-    return Some(ret[0].clone());
+    if !ret.is_empty() {
+        return Some(ret[0].clone());
+    }
     
     // If that didn't work, try recursively looping through indices that can be removed
     let removable_indices = get_removable_indices(old_board, min_col, max_col, min_row, max_row);
@@ -1423,23 +1426,28 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
         _ => {}
     }
     let chunk_size = (valid_words_vec.len() as f32)/(default_parallelism_approx as f32);
-    let chunks: Vec<Vec<Word>> = valid_words_vec.chunks(chunk_size.ceil() as usize).map(|words| words.to_vec()).collect();
+    let mut chunks: Vec<Vec<Word>> = vec![Vec::with_capacity(chunk_size.ceil() as usize); default_parallelism_approx];
+    for (i, word) in valid_words_vec.iter().enumerate() {
+        chunks[i % default_parallelism_approx].push(word.clone());
+    }
     // Prepare for threading/early termination using `AtomicBool`
     let stop = Arc::new(AtomicBool::new(false));
     let mut handles: Vec<thread::JoinHandle<()>> = Vec::with_capacity(chunks.len());
     let char_vec: Vec<(Vec<Vec<String>>, Board, usize, usize, usize, usize)> = Vec::new();
     let ret_val = Arc::new(Mutex::new(char_vec));
+    let tried: Arc<Mutex<HashSet<Word>>> = Arc::new(Mutex::new(HashSet::new()));
     // For each thread (i.e. piece of available parallelism), spawn a new thread to check those words
     // These threads check different sets of initial words in the board, and whichever finishes first signals the others to stop
-    for chunk in chunks.into_iter() {
+    for chunk in chunks {
         let stop_t = stop.clone();
         let new_letters = letters.clone();
         let copied_new_valid_words_vec = valid_words_vec.clone();
         let copied_valid_words_set = valid_words_set.clone();
         let conn = ret_val.clone();
         let cloned_previous_board = previous_board.clone();
+        let tried_words = tried.clone();
         let handle = thread::spawn(move || {
-            let mut tried_words: HashSet<&Word> = HashSet::new();
+            // let mut tried_words: HashSet<&Word> = HashSet::new();
             // Loop through each word and play it on a new board
             let mut words_checked = 0;
             for word in chunk.iter() {
@@ -1460,13 +1468,6 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                 if use_letters.iter().all(|count| *count == 0) {
                     if !stop_t.load(Ordering::Relaxed) {
                         stop_t.store(true, Ordering::Relaxed);
-                        let previous_idxs: HashSet<(usize, usize)>;
-                        match cloned_previous_board {
-                            Some(prev) => {
-                                previous_idxs = get_board_overlap(&prev.0, &board, prev.1, prev.2, prev.3, prev.4, min_col, max_col, min_row, max_row);
-                            },
-                            None => {previous_idxs = HashSet::new();}
-                        }
                         // The expect may panic the thread but I think that's ok
                         let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
                         ret.push((board_to_vec(&board, min_col, max_col, min_row, max_row, &HashSet::new()), board.clone(), min_col, max_col, min_row, max_row));
@@ -1476,9 +1477,9 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                 else {
                     // Reduce the set of remaining words to check to those that can be played with the letters not in the first word (plus only one of the tiles played in the first word)
                     let word_letters: HashSet<usize> = HashSet::from_iter(word.clone().into_iter());
-                    let mut new_valid_words_vec: Vec<&Word> = Vec::with_capacity(copied_new_valid_words_vec.len()-tried_words.len());
+                    let mut new_valid_words_vec: Vec<&Word> = Vec::with_capacity(copied_new_valid_words_vec.len());
                     for w in copied_new_valid_words_vec.iter() {
-                        if check_filter_after_play(use_letters.clone(), w, &word_letters) && !tried_words.contains(w) {
+                        if check_filter_after_play(use_letters.clone(), w, &word_letters) && !tried_words.lock().expect("Failed to get lock on tried_words").contains(w) {
                             new_valid_words_vec.push(w);
                         }
                     }
@@ -1502,7 +1503,7 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                                 break;
                             }
                             else {
-                                tried_words.insert(word);
+                                tried_words.lock().expect("Failed to get lock on tried words").insert(word.clone());
                             }
                         },
                         // If an error (we're out of bounds or another thread signalled to stop) then we're done
@@ -1516,7 +1517,7 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
         handles.push(handle);
     }
     // Wait for all the threads
-    for handle in handles.into_iter() {
+    for handle in handles {
         let _res = handle.join();
     }
     // If we're done, store the result in the `State` and return the result to the frontend
