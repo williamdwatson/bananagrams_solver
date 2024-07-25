@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::num::NonZeroUsize;
 use std::{cmp, fmt, thread, usize, collections::HashMap};
 use hashbrown::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -320,7 +321,7 @@ fn is_makeable(word: &Word, letters: &Letters) -> bool {
 /// * `valid_words` - HashSet of all valid words as `Vec<usize>`s
 /// # Returns
 /// `bool` - whether the given `board` is made only of valid words
-fn is_board_valid_horizontal(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, row: usize, start_col: usize, end_col: usize, valid_words: &HashSet<Word>) -> bool {
+fn is_board_valid_horizontal(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, row: usize, start_col: usize, end_col: usize, valid_words: &HashSet<&Word>) -> bool {
     let mut current_letters: Vec<usize> = Vec::with_capacity(MAX_WORD_LENGTH);
     // Find the furtherest left column that the new play is connected to
     let mut minimum_col = start_col;
@@ -400,7 +401,7 @@ fn is_board_valid_horizontal(board: &Board, min_col: usize, max_col: usize, min_
 /// * `valid_words` - HashSet of all valid words as `Vec<usize>`s
 /// # Returns
 /// `bool` - whether the given `board` is made only of valid words
-fn is_board_valid_vertical(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, start_row: usize, end_row: usize, col: usize, valid_words: &HashSet<Word>) -> bool {
+fn is_board_valid_vertical(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, start_row: usize, end_row: usize, col: usize, valid_words: &HashSet<&Word>) -> bool {
     let mut current_letters: Vec<usize> = Vec::with_capacity(MAX_WORD_LENGTH);
     // Find the furtherest up row that the new play is connected to
     let mut minimum_row = start_row;
@@ -709,8 +710,8 @@ fn check_filter_after_play(mut letters: Letters, word_being_checked: &Word, play
 /// * `usize` - Minimum occupied row index in `board`
 /// * `usize` - Maximum occupied row index in `board`
 /// 
-/// *or `None` if no valid playing location was found, or empty `Err` on if out-of-bounds or another thread signalled to stop*
-fn try_play_word_horizontal(board: &mut Board, word: &Word, min_col: usize, max_col: usize, min_row: usize, max_row: usize, valid_words_vec: &Vec<&Word>, valid_words_set: &HashSet<Word>, letters: Letters, depth: usize, words_checked: &mut usize, letters_on_board: &mut Letters, filter_letters_on_board: usize, max_words_to_check: usize, stop_t: &Arc<AtomicBool>) -> Result<Option<(bool, usize, usize, usize, usize)>, ()> {
+/// *or `None` if no valid playing location was found, or empty `Err` another thread signalled to stop*
+fn try_play_word_horizontal(board: &mut Board, word: &Word, min_col: usize, max_col: usize, min_row: usize, max_row: usize, valid_words_vec: &Vec<&Word>, valid_words_set: &HashSet<&Word>, letters: Letters, depth: usize, words_checked: &mut usize, letters_on_board: &mut Letters, filter_letters_on_board: usize, max_words_to_check: usize, stop_t: &Arc<AtomicBool>) -> Result<Option<(bool, usize, usize, usize, usize)>, ()> {
     // Try across all rows (starting from one before to one after)
     for row_idx in min_row-1..max_row+2 {
         // For each row, try across all columns (starting from the farthest out the word could be played)
@@ -790,8 +791,8 @@ fn try_play_word_horizontal(board: &mut Board, word: &Word, min_col: usize, max_
 /// * `usize` - Minimum occupied row index in `board`
 /// * `usize` - Maximum occupied row index in `board`
 /// 
-/// *or `None` if no valid playing location was found, or empty `Err` on if out-of-bounds or another thread signalled to stop*
-fn try_play_word_vertically(board: &mut Board, word: &Word, min_col: usize, max_col: usize, min_row: usize, max_row: usize, valid_words_vec: &Vec<&Word>, valid_words_set: &HashSet<Word>, letters: Letters, depth: usize, words_checked: &mut usize, letters_on_board: &mut Letters, filter_letters_on_board: usize, max_words_to_check: usize, stop_t: &Arc<AtomicBool>) -> Result<Option<(bool, usize, usize, usize, usize)>, ()> {
+/// *or `None` if no valid playing location was found, or empty `Err` if another thread signalled to stop*
+fn try_play_word_vertically(board: &mut Board, word: &Word, min_col: usize, max_col: usize, min_row: usize, max_row: usize, valid_words_vec: &Vec<&Word>, valid_words_set: &HashSet<&Word>, letters: Letters, depth: usize, words_checked: &mut usize, letters_on_board: &mut Letters, filter_letters_on_board: usize, max_words_to_check: usize, stop_t: &Arc<AtomicBool>) -> Result<Option<(bool, usize, usize, usize, usize)>, ()> {
     // Try down all columns
     for col_idx in min_col-1..max_col+2 {
         // This is analagous to the above
@@ -862,7 +863,7 @@ fn try_play_word_vertically(board: &mut Board, word: &Word, min_col: usize, max_
 /// * `usize` - Maximum occupied row index in `board`
 /// 
 /// *or empty `Err` on if out-of-bounds, past the maximum number of words to check, or another thread signalled to stop*
-fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, valid_words_vec: &Vec<&Word>, valid_words_set: &HashSet<Word>, letters: Letters, depth: usize, words_checked: &mut usize, letters_on_board: &mut Letters, filter_letters_on_board: usize, max_words_to_check: usize, stop_t: &Arc<AtomicBool>) -> Result<(bool, usize, usize, usize, usize), ()> {
+fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, valid_words_vec: &Vec<&Word>, valid_words_set: &HashSet<&Word>, letters: Letters, depth: usize, words_checked: &mut usize, letters_on_board: &mut Letters, filter_letters_on_board: usize, max_words_to_check: usize, stop_t: &Arc<AtomicBool>) -> Result<(bool, usize, usize, usize, usize), ()> {
     if *words_checked > max_words_to_check || stop_t.load(Ordering::Relaxed) {
         return Err(());
     }
@@ -928,7 +929,7 @@ fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usiz
 /// * `valid_words_set` - HashSet of all valid words
 /// # Returns
 /// `Option` - either `None` if no solution was found, or a `Some` tuple of `(row, col, new_min_col, new_max_col, new_min_row, new_max_row)` on success
-fn play_one_letter(board: &mut Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, letter: usize, valid_words_set: &HashSet<Word>) -> Option<(usize, usize, usize, usize, usize, usize)> {
+fn play_one_letter(board: &mut Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, letter: usize, valid_words_set: &HashSet<&Word>) -> Option<(usize, usize, usize, usize, usize, usize)> {
     // Loop through all possible locations and check if the letter works there
     for row in min_row-1..max_row+2 {
         for col in min_col-1..max_col+2 {
@@ -966,7 +967,7 @@ fn play_one_letter(board: &mut Board, min_col: usize, max_col: usize, min_row: u
 /// * `letters` - Letters in the new hand
 /// * `filter_letters_on_board` - Maximum number of letters from the board that can be used in a word
 /// * `max_words_to_check` - Maximum number of words to check
-fn play_existing(old_board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, letters: &Letters, valid_words_set: &HashSet<Word>, dict_to_use: &Vec<Word>, filter_letters_on_board: usize, max_words_to_check: usize) -> Option<BoardAndIdxs> {
+fn play_existing(old_board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, letters: &Letters, valid_words_set: &HashSet<&Word>, dict_to_use: &Vec<Word>, filter_letters_on_board: usize, max_words_to_check: usize) -> Option<BoardAndIdxs> {
     // First, try to play words that use only the new letters, plus one already present on the board
     let mut hand_letters = letters.clone();
     let mut old_letters_on_board = [0usize; 26];
@@ -980,66 +981,65 @@ fn play_existing(old_board: &Board, min_col: usize, max_col: usize, min_row: usi
             }
         }
     }
-    let valid_words_vec: Vec<Word> = dict_to_use.iter().filter(|w| check_filter_after_play(hand_letters, w, &played_on_board)).map(|w| w.clone()).collect();
-    if valid_words_vec.len() == 0 {
+    println!("Hand letters: {:?}", hand_letters);
+    let valid_words_vec: Vec<&Word> = dict_to_use.iter().filter(|w| check_filter_after_play(hand_letters, w, &played_on_board)).collect();
+    if valid_words_vec.is_empty() {
         return None;
     }
     // Split the words to check up into appropriate chunks based on the available parallelism
-    let mut default_parallelism_approx = 1usize;
-    match thread::available_parallelism() {
-        Ok(available_parallelism) => {
-            default_parallelism_approx = available_parallelism.into();
-        },
-        _ => {}
-    }
+    let default_parallelism_approx =  thread::available_parallelism().unwrap_or(NonZeroUsize::new(1).unwrap()).get();
     let chunk_size = (valid_words_vec.len() as f32)/(default_parallelism_approx as f32);
-    let mut chunks: Vec<Vec<Word>> = vec![Vec::with_capacity(chunk_size.ceil() as usize); default_parallelism_approx];
+    let mut chunks: Vec<Vec<&Word>> = vec![Vec::with_capacity(chunk_size.ceil() as usize); default_parallelism_approx];
     for (i, word) in valid_words_vec.iter().enumerate() {
-        chunks[i % default_parallelism_approx].push(word.to_vec());
+        chunks[i % default_parallelism_approx].push(word);
     }
     // Prepare for threading/early termination using `AtomicBool`
     let stop = Arc::new(AtomicBool::new(false));
-    let mut handles: Vec<thread::JoinHandle<()>> = Vec::with_capacity(chunks.len());
     let char_vec: Vec<(Board, usize, usize, usize, usize)> = Vec::new();
     let ret_val = Arc::new(Mutex::new(char_vec));
+    let arc_valid_words_vec = Arc::new(valid_words_vec);
+    let arc_valid_words_set = Arc::new(valid_words_set);
     // For each thread (i.e. piece of available parallelism), spawn a new thread to check those words
     // These threads check different sets of initial words in the board, and whichever finishes first signals the others to stop
-    for chunk in chunks {
-        let stop_t = stop.clone();
-        let new_letters = hand_letters.clone();
-        let copied_new_valid_words_vec = valid_words_vec.clone();
-        let copied_valid_words_set = valid_words_set.clone();
-        let conn = ret_val.clone();
-        let board_cloned = old_board.clone();
-        let letters_on_board = old_letters_on_board.clone();
-        let handle = thread::spawn(move || {
-            // Loop through each word and play it on a new board
-            let mut words_checked = 0;
-            for word in chunk.iter() {
-                let mut board = board_cloned.clone();
-                let r = try_play_word_horizontal(&mut board, word, min_col, max_col, min_row, max_row, &copied_new_valid_words_vec.iter().collect(), &copied_valid_words_set, new_letters, 0, &mut words_checked, &mut letters_on_board.clone(), filter_letters_on_board, max_words_to_check, &stop_t);
-                match r {
-                    Ok(rr) => {
-                        if let Some(rrr) = rr {
-                            if rrr.0 && !stop_t.load(Ordering::Relaxed) {
-                                stop_t.store(true, Ordering::Relaxed);
-                                // The expect may panic the thread but I think that's ok
-                                let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
-                                ret.push((board.clone(), min_col, max_col, min_row, max_row));
-                                break;
+    thread::scope(|s| {
+        let mut handles: Vec<thread::ScopedJoinHandle<()>> = Vec::with_capacity(chunks.len());
+        for chunk in chunks {
+            let stop_t = stop.clone();
+            let new_letters = hand_letters.clone();
+            let copied_new_valid_words_vec = Arc::clone(&arc_valid_words_vec);
+            let copied_valid_words_set = Arc::clone(&arc_valid_words_set);
+            let conn = ret_val.clone();
+            let board_cloned = old_board.clone();
+            let letters_on_board = old_letters_on_board.clone();
+            let handle = s.spawn(move || {
+                // Loop through each word and play it on a new board
+                let mut words_checked = 0;
+                for word in chunk.iter() {
+                    let mut board = board_cloned.clone();
+                    let r = try_play_word_horizontal(&mut board, word, min_col, max_col, min_row, max_row, &copied_new_valid_words_vec, &copied_valid_words_set, new_letters, 0, &mut words_checked, &mut letters_on_board.clone(), filter_letters_on_board, max_words_to_check, &stop_t);
+                    match r {
+                        Ok(rr) => {
+                            if let Some(rrr) = rr {
+                                if rrr.0 && !stop_t.load(Ordering::Relaxed) {
+                                    stop_t.store(true, Ordering::Relaxed);
+                                    println!("{}", convert_array_to_word(word));
+                                    let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
+                                    ret.push((board, min_col, max_col, min_row, max_row));
+                                    break;
+                                }
                             }
-                        }
-                    },
-                    Err(_) => {break;}
+                        },
+                        Err(_) => {break;}
+                    }
                 }
-            }
-        });
-        handles.push(handle);
-    }
-    // Wait for all the threads
-    for handle in handles {
-        let _res = handle.join();
-    }
+            });
+            handles.push(handle);
+        }
+        // Wait for all the threads
+        for handle in handles {
+            let _res = handle.join();
+        }
+    });    
     // If we're done, store the result in the `State` and return the result to the frontend
     let ret = ret_val.lock().expect("Failed to get lock on shared ret_val when checking return");
     if !ret.is_empty() {
@@ -1061,6 +1061,16 @@ enum LetterComparison {
     GreaterByMoreThanOne,
     /// The hand is the same as before
     Same
+}
+impl fmt::Debug for LetterComparison {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            LetterComparison::SomeLess => write!(f, "Some less"),
+            LetterComparison::GreaterByOne => write!(f, "Greater by one"),
+            LetterComparison::GreaterByMoreThanOne => write!(f, "Greater by more than one"),
+            LetterComparison::Same => write!(f, "Same")
+        }
+     }
 }
 
 /// Struct returned when getting playable words
@@ -1354,6 +1364,7 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                     seen_greater = i;
                 }
             }
+            println!("{:?}", comparison);
             let dict_to_use = if *state.use_long_dictionary.lock().or(Err("Failed to get lock on using long dictionary!"))? {&state.all_words_long} else {&state.all_words_short};
             match comparison {
                 LetterComparison::Same => {
@@ -1363,7 +1374,7 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                 LetterComparison::GreaterByOne => {
                     // If only a single letter has increased by one, then first check just that letter
                     let valid_words_vec: Vec<Word> = state.all_words_short.iter().filter(|word| is_makeable(word, &letters)).map(|word| word.clone()).collect();
-                    let valid_words_set: HashSet<Word> = HashSet::from_iter(valid_words_vec.clone());
+                    let valid_words_set: HashSet<&Word> = HashSet::from_iter(valid_words_vec.iter());
                     let mut board = prev_state.board.clone();
                     let res = play_one_letter(&mut board, prev_state.min_col, prev_state.max_col, prev_state.min_row, prev_state.max_row, seen_greater, &valid_words_set);
                     match res {
@@ -1388,12 +1399,7 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                 },
                 LetterComparison::GreaterByMoreThanOne => {
                     // If a letter has increased by more than one, or multiple have increased by one or more, then try playing off the existing board
-                    let mut valid_words_set: HashSet<Word> = HashSet::new();
-                    for word in dict_to_use.iter() {
-                        if is_makeable(word, &letters) {
-                            valid_words_set.insert(word.clone());
-                        }
-                    }
+                    let valid_words_set: HashSet<&Word> = HashSet::from_iter(dict_to_use.iter().filter(|word| is_makeable(word, &letters)));
                     let attempt = play_existing(&prev_state.board, prev_state.min_col, prev_state.max_col, prev_state.min_row, prev_state.max_row, &letters, &valid_words_set, dict_to_use, filter_letters_on_board, max_words_to_check);
                     match attempt {
                         Some(result) => {
@@ -1412,114 +1418,111 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
     // Play from scratch
     // Get a vector of all valid words
     let dict_to_use = if *state.use_long_dictionary.lock().or(Err("Failed to get lock on using long dictionary!"))? {&state.all_words_long} else {&state.all_words_short};
-    let valid_words_vec: Vec<Word> = dict_to_use.iter().filter(|word| is_makeable(word, &letters)).map(|word| word.clone()).collect();
-    if valid_words_vec.len() == 0 {
+    let valid_words_vec: Vec<&Word> = dict_to_use.iter().filter(|word| is_makeable(word, &letters)).collect();
+    if valid_words_vec.is_empty() {
         return Err("No valid words can be formed from the current letters - dump and try again!".to_owned());
     }
-    let valid_words_set: HashSet<Word> = HashSet::from_iter(valid_words_vec.clone());
+    let valid_words_set: HashSet<&Word> = HashSet::from_iter(valid_words_vec.iter().map(|w| w.clone()));
     // Split the words to check up into appropriate chunks based on the available parallelism
-    let mut default_parallelism_approx = 1usize;
-    match thread::available_parallelism() {
-        Ok(available_parallelism) => {
-            default_parallelism_approx = available_parallelism.into();
-        },
-        _ => {}
-    }
+    let default_parallelism_approx =  thread::available_parallelism().unwrap_or(NonZeroUsize::new(1).unwrap()).get();
     let chunk_size = (valid_words_vec.len() as f32)/(default_parallelism_approx as f32);
-    let mut chunks: Vec<Vec<Word>> = vec![Vec::with_capacity(chunk_size.ceil() as usize); default_parallelism_approx];
+    let mut chunks: Vec<Vec<&Word>> = vec![Vec::with_capacity(chunk_size.ceil() as usize); default_parallelism_approx];
     for (i, word) in valid_words_vec.iter().enumerate() {
         chunks[i % default_parallelism_approx].push(word.clone());
     }
     // Prepare for threading/early termination using `AtomicBool`
     let stop = Arc::new(AtomicBool::new(false));
-    let mut handles: Vec<thread::JoinHandle<()>> = Vec::with_capacity(chunks.len());
     let char_vec: Vec<(Vec<Vec<String>>, Board, usize, usize, usize, usize)> = Vec::new();
     let ret_val = Arc::new(Mutex::new(char_vec));
-    let tried: Arc<Mutex<HashSet<Word>>> = Arc::new(Mutex::new(HashSet::new()));
+    let tried: Arc<Mutex<HashSet<&Word>>> = Arc::new(Mutex::new(HashSet::new()));
+    let valid_words_vec_len = valid_words_vec.len();
+    let arc_valid_words_vec = Arc::new(valid_words_vec);
+    let arc_valid_words_set = Arc::new(valid_words_set);
     // For each thread (i.e. piece of available parallelism), spawn a new thread to check those words
     // These threads check different sets of initial words in the board, and whichever finishes first signals the others to stop
-    for chunk in chunks {
-        let stop_t = stop.clone();
-        let new_letters = letters.clone();
-        let copied_new_valid_words_vec = valid_words_vec.clone();
-        let copied_valid_words_set = valid_words_set.clone();
-        let conn = ret_val.clone();
-        let cloned_previous_board = previous_board.clone();
-        let tried_words = tried.clone();
-        let handle = thread::spawn(move || {
-            // let mut tried_words: HashSet<&Word> = HashSet::new();
-            // Loop through each word and play it on a new board
-            let mut words_checked = 0;
-            for word in chunk.iter() {
-                let mut board = Board::new();
-                let col_start = BOARD_SIZE/2 - word.len()/2;
-                let row = BOARD_SIZE/2;
-                let mut use_letters: [usize; 26] = new_letters.clone();
-                let mut letters_on_board = [0usize; 26];
-                for i in 0..word.len() {
-                    board.set_val(row, col_start+i, word[i]);
-                    letters_on_board[word[i]] += 1;
-                    use_letters[word[i]] -= 1;  // Should never underflow because we've verified that every word is playable with these letters
-                }
-                let min_col = col_start;
-                let min_row = row;
-                let max_col = col_start + (word.len()-1);
-                let max_row = row;
-                if use_letters.iter().all(|count| *count == 0) {
-                    if !stop_t.load(Ordering::Relaxed) {
-                        stop_t.store(true, Ordering::Relaxed);
-                        // The expect may panic the thread but I think that's ok
-                        let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
-                        ret.push((board_to_vec(&board, min_col, max_col, min_row, max_row, &HashSet::new()), board.clone(), min_col, max_col, min_row, max_row));
-                        break;
+    thread::scope(|s| {
+        let mut handles: Vec<thread::ScopedJoinHandle<()>> = Vec::with_capacity(chunks.len());
+        for chunk in chunks {
+            let stop_t = stop.clone();
+            let new_letters = letters.clone();
+            let copied_new_valid_words_vec = Arc::clone(&arc_valid_words_vec);
+            let copied_valid_words_set = Arc::clone(&arc_valid_words_set);
+            let conn = Arc::clone(&ret_val);
+            let cloned_previous_board = previous_board.clone();
+            let tried_words = Arc::clone(&tried);
+            let handle = s.spawn(move || {
+                // Loop through each word and play it on a new board
+                let mut words_checked = 0;
+                for word in chunk.iter() {
+                    let mut board = Board::new();
+                    let col_start = BOARD_SIZE/2 - word.len()/2;
+                    let row = BOARD_SIZE/2;
+                    let mut use_letters: [usize; 26] = new_letters.clone();
+                    let mut letters_on_board = [0usize; 26];
+                    for i in 0..word.len() {
+                        board.set_val(row, col_start+i, word[i]);
+                        letters_on_board[word[i]] += 1;
+                        use_letters[word[i]] -= 1;  // Should never underflow because we've verified that every word is playable with these letters
                     }
-                }
-                else {
-                    // Reduce the set of remaining words to check to those that can be played with the letters not in the first word (plus only one of the tiles played in the first word)
-                    let word_letters: HashSet<usize> = HashSet::from_iter(word.clone().into_iter());
-                    let mut new_valid_words_vec: Vec<&Word> = Vec::with_capacity(copied_new_valid_words_vec.len());
-                    for w in copied_new_valid_words_vec.iter() {
-                        if check_filter_after_play(use_letters.clone(), w, &word_letters) && !tried_words.lock().expect("Failed to get lock on tried_words").contains(w) {
-                            new_valid_words_vec.push(w);
-                        }
-                    }
-                    // Begin the recursive processing
-                    let result = play_further(&mut board, min_col, max_col, min_row, max_row, &new_valid_words_vec, &copied_valid_words_set, use_letters, 0, &mut words_checked, &mut letters_on_board, filter_letters_on_board, max_words_to_check, &stop_t);
-                    match result {
-                        // If the result was good, then store it and signal other threads to finish (so long as another thread isn't doing so)
-                        Ok(res) => {
-                            if res.0 && !stop_t.load(Ordering::Relaxed) {
-                                stop_t.store(true, Ordering::Relaxed);
-                                // The expect will panic the thread but I think that's ok
-                                let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
-                                let previous_idxs: HashSet<(usize, usize)>;
-                                match cloned_previous_board {
-                                    Some(prev) => {
-                                        previous_idxs = get_board_overlap(&prev.0, &board, prev.1, prev.2, prev.3, prev.4, res.1, res.2, res.3, res.4);
-                                    },
-                                    None => {previous_idxs = HashSet::new();}
-                                }
-                                ret.push((board_to_vec(&board, res.1, res.2, res.3, res.4, &previous_idxs), board.clone(), res.1, res.2, res.3, res.4));
-                                break;
-                            }
-                            else {
-                                tried_words.lock().expect("Failed to get lock on tried words").insert(word.clone());
-                            }
-                        },
-                        // If an error (we're out of bounds or another thread signalled to stop) then we're done
-                        Err(()) => {
+                    let min_col = col_start;
+                    let min_row = row;
+                    let max_col = col_start + (word.len()-1);
+                    let max_row = row;
+                    if use_letters.iter().all(|count| *count == 0) {
+                        if !stop_t.load(Ordering::Relaxed) {
+                            stop_t.store(true, Ordering::Relaxed);
+                            let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
+                            ret.push((board_to_vec(&board, min_col, max_col, min_row, max_row, &HashSet::new()), board.clone(), min_col, max_col, min_row, max_row));
                             break;
                         }
                     }
+                    else {
+                        // Reduce the set of remaining words to check to those that can be played with the letters not in the first word (plus only one of the tiles played in the first word)
+                        let word_letters: HashSet<usize> = HashSet::from_iter(word.iter().map(|c| c.clone()));
+                        let mut new_valid_words_vec: Vec<&Word> = Vec::with_capacity(valid_words_vec_len);
+                        for w in copied_new_valid_words_vec.iter() {
+                            if check_filter_after_play(use_letters.clone(), w, &word_letters) && !tried_words.lock().expect("Failed to get lock on tried_words").contains(w) {
+                                new_valid_words_vec.push(w);
+                            }
+                        }
+                        // Begin the recursive processing
+                        let result = play_further(&mut board, min_col, max_col, min_row, max_row, &new_valid_words_vec, &copied_valid_words_set, use_letters, 0, &mut words_checked, &mut letters_on_board, filter_letters_on_board, max_words_to_check, &stop_t);
+                        match result {
+                            // If the result was good, then store it and signal other threads to finish (so long as another thread isn't doing so)
+                            Ok(res) => {
+                                if res.0 && !stop_t.load(Ordering::Relaxed) {
+                                    stop_t.store(true, Ordering::Relaxed);
+                                    // The expect will panic the thread but I think that's ok
+                                    let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
+                                    let previous_idxs: HashSet<(usize, usize)>;
+                                    match cloned_previous_board {
+                                        Some(prev) => {
+                                            previous_idxs = get_board_overlap(&prev.0, &board, prev.1, prev.2, prev.3, prev.4, res.1, res.2, res.3, res.4);
+                                        },
+                                        None => {previous_idxs = HashSet::new();}
+                                    }
+                                    ret.push((board_to_vec(&board, res.1, res.2, res.3, res.4, &previous_idxs), board.clone(), res.1, res.2, res.3, res.4));
+                                    break;
+                                }
+                                else {
+                                    tried_words.lock().expect("Failed to get lock on tried words").insert(word);
+                                }
+                            },
+                            // If an error (we're out of bounds or another thread signalled to stop) then we're done
+                            Err(()) => {
+                                break;
+                            }
+                        }
+                    }
                 }
-            }
-        });
-        handles.push(handle);
-    }
-    // Wait for all the threads
-    for handle in handles {
-        let _res = handle.join();
-    }
+            });
+            handles.push(handle);
+        }
+        // Wait for all the threads
+        for handle in handles {
+            let _res = handle.join();
+        }
+    });
     // If we're done, store the result in the `State` and return the result to the frontend
     let ret: std::sync::MutexGuard<'_, Vec<(Vec<Vec<String>>, Board, usize, usize, usize, usize)>>;
     match ret_val.lock() {
