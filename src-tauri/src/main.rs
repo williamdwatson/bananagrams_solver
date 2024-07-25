@@ -47,6 +47,8 @@ impl Board {
     /// * `col` - Column index of the value to get (must be less than `BOARD_SIZE`)
     /// # Returns
     /// `usize` - The value in the board at `(row, col)`
+    /// # Panics
+    /// If `row` or `col` are out-of-bounds
     fn get_val(&self, row: usize, col: usize) -> usize {
         return *self.arr.get(row*BOARD_SIZE + col).expect("Index not in range!");
     }
@@ -56,6 +58,8 @@ impl Board {
     /// * `row` - Row index of the value to get (must be less than `BOARD_SIZE`)
     /// * `col` - Column index of the value to get (must be less than `BOARD_SIZE`)
     /// * `val` - Value to set at `(row, col)` in the board
+    /// # Panics
+    /// If `row` or `col` are out-of-bounds
     fn set_val(&mut self, row: usize, col: usize, val: usize) {
         let v = self.arr.get_mut(row*BOARD_SIZE + col).expect("Index not in range!");
         *v = val;
@@ -493,9 +497,9 @@ impl fmt::Display for LetterUsage {
 impl fmt::Debug for LetterUsage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-             LetterUsage::Remaining => write!(f, "Remaining"),
-             LetterUsage::Overused => write!(f, "Overused"),
-             LetterUsage::Finished => write!(f, "Finished")
+            LetterUsage::Remaining => write!(f, "Remaining"),
+            LetterUsage::Overused => write!(f, "Overused"),
+            LetterUsage::Finished => write!(f, "Finished")
         }
      }
 }
@@ -515,6 +519,14 @@ impl fmt::Display for Direction {
             Direction::Horizontal => write!(f, "Vertical")
        }
     }
+}
+impl fmt::Debug for Direction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Direction::Vertical => write!(f, "Horizontal"),
+            Direction::Horizontal => write!(f, "Vertical")
+        }
+     }
 }
 
 /// Plays a word on the board
@@ -731,8 +743,6 @@ fn try_play_word_horizontal(board: &mut Board, word: &Word, min_col: usize, max_
                             return Ok(Some((true, new_min_col, new_max_col, new_min_row, new_max_row)));
                         },
                         LetterUsage::Remaining => {
-                            // Another option: let new_valid_words_vec: Vec<&Word> = valid_words_vec.clone().into_iter().filter(|w| check_filter_after_play_later(letters.clone(), letters_on_board.clone(), w)).collect();
-                            // I think doing it that way might be less efficient however due to the `clone` of `valid_words_vec`
                             let mut new_valid_words_vec: Vec<&Word> = Vec::with_capacity(valid_words_vec.len()/2);
                             for i in 0..valid_words_vec.len() {
                                 if check_filter_after_play_later(letters.clone(), letters_on_board.clone(), valid_words_vec[i], filter_letters_on_board) {
@@ -981,7 +991,6 @@ fn play_existing(old_board: &Board, min_col: usize, max_col: usize, min_row: usi
             }
         }
     }
-    println!("Hand letters: {:?}", hand_letters);
     let valid_words_vec: Vec<&Word> = dict_to_use.iter().filter(|w| check_filter_after_play(hand_letters, w, &played_on_board)).collect();
     if valid_words_vec.is_empty() {
         return None;
@@ -1008,23 +1017,22 @@ fn play_existing(old_board: &Board, min_col: usize, max_col: usize, min_row: usi
             let new_letters = hand_letters.clone();
             let copied_new_valid_words_vec = Arc::clone(&arc_valid_words_vec);
             let copied_valid_words_set = Arc::clone(&arc_valid_words_set);
-            let conn = ret_val.clone();
+            let conn = Arc::clone(&ret_val);
             let board_cloned = old_board.clone();
             let letters_on_board = old_letters_on_board.clone();
             let handle = s.spawn(move || {
                 // Loop through each word and play it on a new board
                 let mut words_checked = 0;
+                let mut board = board_cloned.clone();
                 for word in chunk.iter() {
-                    let mut board = board_cloned.clone();
                     let r = try_play_word_horizontal(&mut board, word, min_col, max_col, min_row, max_row, &copied_new_valid_words_vec, &copied_valid_words_set, new_letters, 0, &mut words_checked, &mut letters_on_board.clone(), filter_letters_on_board, max_words_to_check, &stop_t);
                     match r {
                         Ok(rr) => {
                             if let Some(rrr) = rr {
                                 if rrr.0 && !stop_t.load(Ordering::Relaxed) {
                                     stop_t.store(true, Ordering::Relaxed);
-                                    println!("{}", convert_array_to_word(word));
                                     let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
-                                    ret.push((board, min_col, max_col, min_row, max_row));
+                                    ret.push((board, rrr.1, rrr.2, rrr.3, rrr.4));
                                     break;
                                 }
                             }
@@ -1364,7 +1372,6 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                     seen_greater = i;
                 }
             }
-            println!("{:?}", comparison);
             let dict_to_use = if *state.use_long_dictionary.lock().or(Err("Failed to get lock on using long dictionary!"))? {&state.all_words_long} else {&state.all_words_short};
             match comparison {
                 LetterComparison::Same => {
@@ -1373,8 +1380,7 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                 },
                 LetterComparison::GreaterByOne => {
                     // If only a single letter has increased by one, then first check just that letter
-                    let valid_words_vec: Vec<Word> = state.all_words_short.iter().filter(|word| is_makeable(word, &letters)).map(|word| word.clone()).collect();
-                    let valid_words_set: HashSet<&Word> = HashSet::from_iter(valid_words_vec.iter());
+                    let valid_words_set: HashSet<&Word> = HashSet::from_iter(state.all_words_short.iter().filter(|word| is_makeable(word, &letters)));
                     let mut board = prev_state.board.clone();
                     let res = play_one_letter(&mut board, prev_state.min_col, prev_state.max_col, prev_state.min_row, prev_state.max_row, seen_greater, &valid_words_set);
                     match res {
@@ -1453,8 +1459,8 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
             let handle = s.spawn(move || {
                 // Loop through each word and play it on a new board
                 let mut words_checked = 0;
+                let mut board = Board::new();
                 for word in chunk.iter() {
-                    let mut board = Board::new();
                     let col_start = BOARD_SIZE/2 - word.len()/2;
                     let row = BOARD_SIZE/2;
                     let mut use_letters: [usize; 26] = new_letters.clone();
@@ -1514,6 +1520,9 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                             }
                         }
                     }
+                    for col in min_col..=max_col {
+                        board.set_val(row, col, EMPTY_VALUE);
+                    }
                 }
             });
             handles.push(handle);
@@ -1546,7 +1555,7 @@ fn main() {
     let mut all_words_long: Vec<Word> = include_str!("dictionary.txt").lines().map(convert_word_to_array).collect();
     all_words_long.sort_by(|a, b| b.len().cmp(&a.len()));
     tauri::Builder::default()
-        .manage(AppState { all_words_short, all_words_long, last_game: None.into(), filter_letters_on_board: 21.into(), maximum_words_to_check: 500_000_000.into(), use_long_dictionary: false.into() })
+        .manage(AppState { all_words_short, all_words_long, last_game: None.into(), filter_letters_on_board: 2.into(), maximum_words_to_check: 500_000_000.into(), use_long_dictionary: false.into() })
         .invoke_handler(tauri::generate_handler![play_bananagrams, reset, get_playable_words, get_random_letters, set_max_words_to_check, set_max_letters_from_board, set_use_long_dictionary])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
