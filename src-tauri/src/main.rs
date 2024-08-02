@@ -2,7 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::num::NonZeroUsize;
-use std::{cmp, fmt, thread, usize, collections::HashMap};
+use std::{fmt, thread, usize, collections::HashMap};
 use hashbrown::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -16,6 +16,7 @@ use tauri::State;
 type Word = Vec<usize>;
 /// Represents a hand of letters
 type Letters = [usize; 26];
+/// Represents a board and its minimum and maximum played columns and rows
 type BoardAndIdxs = (Board, usize, usize, usize, usize);
 
 /// The maximum length of any word in the dictionary
@@ -696,6 +697,118 @@ fn check_filter_after_play(mut letters: Letters, word_being_checked: &Word, play
     return true;
 }
 
+/// Gets the minimum and maximum columns where a word could be played at `row` on `board`
+/// # Arguments
+/// * `board` - Board to search
+/// * `row` - Row to check
+/// * `min_col` - Minimum occupied column on `board`
+/// * `max_col` - Maximum occupied column on `board`
+/// # Returns
+/// * `(usize, usize)` - Length-2 tuple of the (minimum column, maximum column) where a word could be played
+fn get_col_limits(board: &Board, row: usize, min_col: usize, max_col: usize) -> (usize, usize) {
+    let mut leftmost = max_col;
+    let mut rightmost = min_col;
+    if row == 0 {
+        for col in min_col..max_col {
+            if board.get_val(row, col) != EMPTY_VALUE || board.get_val(row+1, col) != EMPTY_VALUE {
+                leftmost = col;
+                break;
+            }
+        }
+        for col in (min_col..=max_col).rev() {
+            if board.get_val(row, col) != EMPTY_VALUE || board.get_val(row+1, col) != EMPTY_VALUE {
+                rightmost = col;
+                break;
+            }
+        }
+    }
+    else if row == BOARD_SIZE-1 {
+        for col in min_col..max_col {
+            if board.get_val(row, col) != EMPTY_VALUE || board.get_val(row-1, col) != EMPTY_VALUE {
+                leftmost = col;
+                break;
+            }
+        }
+        for col in (min_col..=max_col).rev() {
+            if board.get_val(row, col) != EMPTY_VALUE || board.get_val(row-1, col) != EMPTY_VALUE {
+                rightmost = col;
+                break;
+            }
+        }
+    }
+    else {
+        for col in min_col..max_col {
+            if board.get_val(row-1, col) != EMPTY_VALUE || board.get_val(row, col) != EMPTY_VALUE || board.get_val(row+1, col) != EMPTY_VALUE {
+                leftmost = col;
+                break;
+            }
+        }
+        for col in (min_col..=max_col).rev() {
+            if board.get_val(row-1, col) != EMPTY_VALUE || board.get_val(row, col) != EMPTY_VALUE || board.get_val(row+1, col) != EMPTY_VALUE {
+                rightmost = col;
+                break;
+            }
+        }
+    }
+    (leftmost, rightmost)
+}
+
+/// Gets the minimum and maximum rows where a word could be played at `col` on `board`
+/// # Arguments
+/// * `board` - Board to search
+/// * `col` - Column to check
+/// * `min_row` - Minimum occupied row on `board`
+/// * `max_row` - Maximum occupied row on `board`
+/// # Returns
+/// * `(usize, usize)` - Length-2 tuple of the (minimum row, maximum row) where a word could be played
+fn get_row_limits(board: &Board, col: usize, min_row: usize, max_row: usize) -> (usize, usize) {
+    let mut uppermost = min_row;
+    let mut lowermost = max_row;
+    if col == 0 {
+        for row in min_row..max_row {
+            if board.get_val(row, col) != EMPTY_VALUE || board.get_val(row, col+1) != EMPTY_VALUE {
+                uppermost = row;
+                break;
+            }
+        }
+        for row in (min_row..=max_row).rev() {
+            if board.get_val(row, col) != EMPTY_VALUE || board.get_val(row, col+1) != EMPTY_VALUE {
+                lowermost = row;
+                break;
+            }
+        }
+    }
+    else if col == BOARD_SIZE-1 {
+        for row in min_row..max_row {
+            if board.get_val(row, col) != EMPTY_VALUE || board.get_val(row, col-1) != EMPTY_VALUE {
+                uppermost = row;
+                break;
+            }
+        }
+        for row in (min_row..=max_row).rev() {
+            if board.get_val(row, col) != EMPTY_VALUE || board.get_val(row, col-1) != EMPTY_VALUE {
+                lowermost = row;
+                break;
+            }
+        }
+    }
+    else {
+        for row in min_row..max_row {
+            if board.get_val(row, col-1) != EMPTY_VALUE || board.get_val(row, col) != EMPTY_VALUE || board.get_val(row, col+1) != EMPTY_VALUE {
+                uppermost = row;
+                break;
+            }
+        }
+        for row in (min_row..=max_row).rev() {
+            if board.get_val(row, col-1) != EMPTY_VALUE || board.get_val(row, col) != EMPTY_VALUE || board.get_val(row, col+1) != EMPTY_VALUE {
+                lowermost = row;
+                break;
+            }
+        }
+    }
+    (uppermost, lowermost)
+}
+
 /// Tries to play a word horizontally anywhere on the `board`
 /// # Arguments
 /// * `board` - The `Board` to modify in-place
@@ -724,9 +837,10 @@ fn check_filter_after_play(mut letters: Letters, word_being_checked: &Word, play
 /// *or `None` if no valid playing location was found, or empty `Err` another thread signalled to stop*
 fn try_play_word_horizontal(board: &mut Board, word: &Word, min_col: usize, max_col: usize, min_row: usize, max_row: usize, valid_words_vec: &Vec<&Word>, valid_words_set: &HashSet<&Word>, letters: Letters, depth: usize, words_checked: &mut usize, letters_on_board: &mut Letters, filter_letters_on_board: usize, max_words_to_check: usize, stop_t: &Arc<AtomicBool>) -> Result<Option<(bool, usize, usize, usize, usize)>, ()> {
     // Try across all rows (starting from one before to one after)
-    for row_idx in min_row-1..=max_row+1 {
+    for row_idx in min_row.saturating_sub(1)..=BOARD_SIZE.min(max_row+1) {
+        let (leftmost_col, rightmmost_col) = get_col_limits(board, row_idx, min_col, max_col);
         // For each row, try across all columns (starting from the farthest out the word could be played)
-        for col_idx in min_col-word.len()..=max_col+1 {
+        for col_idx in leftmost_col.saturating_sub(word.len())..=BOARD_SIZE.min(rightmmost_col+1) {
             // Using the ? because `play_word` can give an `Err` if the index is out of bounds
             let res = board.play_word(word, row_idx, col_idx, Direction::Horizontal, &letters, letters_on_board);
             if res.0 {
@@ -803,9 +917,10 @@ fn try_play_word_horizontal(board: &mut Board, word: &Word, min_col: usize, max_
 /// *or `None` if no valid playing location was found, or empty `Err` if another thread signalled to stop*
 fn try_play_word_vertically(board: &mut Board, word: &Word, min_col: usize, max_col: usize, min_row: usize, max_row: usize, valid_words_vec: &Vec<&Word>, valid_words_set: &HashSet<&Word>, letters: Letters, depth: usize, words_checked: &mut usize, letters_on_board: &mut Letters, filter_letters_on_board: usize, max_words_to_check: usize, stop_t: &Arc<AtomicBool>) -> Result<Option<(bool, usize, usize, usize, usize)>, ()> {
     // Try down all columns
-    for col_idx in min_col-1..=max_col+1 {
+    for col_idx in min_col.saturating_sub(1)..=BOARD_SIZE.min(max_col+1) {
+        let (uppermost_row, lowermost_row) = get_row_limits(board, col_idx, min_row, max_row);
         // This is analagous to the above
-        for row_idx in min_row-word.len()..=max_row+1 {
+        for row_idx in uppermost_row.saturating_sub(word.len())..=BOARD_SIZE.min(lowermost_row+1) {
             let res = board.play_word(word, row_idx, col_idx, Direction::Vertical, &letters, letters_on_board);
             if res.0 {
                 let new_min_col = min_col.min(col_idx);
@@ -940,8 +1055,8 @@ fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usiz
 /// `Option` - either `None` if no solution was found, or a `Some` tuple of `(row, col, new_min_col, new_max_col, new_min_row, new_max_row)` on success
 fn play_one_letter(board: &mut Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, letter: usize, valid_words_set: &HashSet<&Word>) -> Option<(usize, usize, usize, usize, usize, usize)> {
     // Loop through all possible locations and check if the letter works there
-    for row in min_row-1..=max_row+1 {
-        for col in min_col-1..=max_col+1 {
+    for row in min_row.saturating_sub(1)..=BOARD_SIZE.min(max_row+1) {
+        for col in min_col.saturating_sub(1)..=BOARD_SIZE.min(max_col+1) {
             if row < BOARD_SIZE && col < BOARD_SIZE && board.get_val(row, col) == EMPTY_VALUE {   // row/col don't need to be checked if they're greater than 0 since they'd underflow
                 if (col > 0 && board.get_val(row, col-1) != EMPTY_VALUE) || (col < BOARD_SIZE-1 && board.get_val(row, col+1) != EMPTY_VALUE) || (row > 0 && board.get_val(row-1, col) != EMPTY_VALUE) || (row < BOARD_SIZE-1 && board.get_val(row+1, col) != EMPTY_VALUE) {
                     board.set_val(row, col, letter);
@@ -1130,6 +1245,17 @@ struct AppState {
     use_long_dictionary: Mutex<bool>
 }
 
+/// Represents the current settings
+#[derive(Serialize)]
+struct CurrentSettings {
+    /// Number of letters present on the board that can be used in a word (higher will result in fewer words being filtered out)
+    filter_letters_on_board: usize,
+    /// Maximum number of words to check before stopping
+    maximum_words_to_check: usize,
+    /// Whether to use the long dictionary or the short one
+    use_long_dictionary: bool
+}
+
 /// Generates random letters based on user input
 /// # Arguments
 /// * `what` - Whether to generate characters from an "infinite set" (i.e. all are equal likelihood),
@@ -1251,51 +1377,36 @@ async fn get_playable_words(available_letters: HashMap<String, i64>, state: Stat
     return Ok(PlayableWords { short: playable_short, long: playable_long });
 }
 
-/// Updates the maximum number of letters a word can use from the board; higher values will eliminate fewer words (values above the board size will give an exhausize check)
+/// Updates the settings
 /// # Arguments
-/// * `max_letters` - The maximum number of letters than can be used from the board
-/// # Returns
+/// * `filter_letters_on_board` - Maximum number of letters on the board that can be used when forming a word
+/// * `maximum_words_to_check` - Maximum number of iterations to perform
+/// * `use_long_dictionary` - Whether to use the long dictionary instead of the short one
 /// Empty `Result` upon success
 /// 
 /// *or String `Err` upon failure*
 #[tauri::command]
-fn set_max_letters_from_board(max_letters: i64, state: State<'_, AppState>) -> Result<(), String> {
-    if max_letters < 0 {
-        return Err("The maximum letters than can be used from the board must be greater than or equal to 0!".to_owned());
-    }
+fn set_settings(filter_letters_on_board: usize, maximum_words_to_check: usize, use_long_dictionary: bool, state: State<'_, AppState>) -> Result<(), String> {
     let mut to_change = state.filter_letters_on_board.lock().or(Err("Failed to get lock on state!"))?;
-    *to_change = max_letters as usize;
-    Ok(())
-}
-
-/// Updates the maximum number of letters a word can use from the board; higher values will eliminate fewer words (values above the board size will give an exhausize check)
-/// # Arguments
-/// * `max_words` - The maximum number of words than can be used from the board
-/// # Returns
-/// Empty `Result` upon success
-/// 
-/// *or String `Err` upon failure*
-#[tauri::command]
-fn set_max_words_to_check(max_words: i64, state: State<'_, AppState>) -> Result<(), String> {
-    if max_words < 0 {
-        return Err("The maximum letters than can be used from the board must be greater than or equal to 0!".to_owned());
-    }
-    let mut to_change = state.filter_letters_on_board.lock().or(Err("Failed to get lock on state!"))?;
-    *to_change = max_words as usize;
-    Ok(())
-}
-
-/// Updates whether the long or short dictionary is to be used
-/// # Arguments
-/// * `use_long_dictionary` - Whether the long (full Scrabble) dictionary should be used
-/// # Returns
-/// Empty `Result`
-/// 
-#[tauri::command]
-fn set_use_long_dictionary(use_long_dictionary: bool, state: State<'_, AppState>) -> Result<(), String> {
+    *to_change = filter_letters_on_board;
+    let mut to_change = state.maximum_words_to_check.lock().or(Err("Failed to get lock on state!"))?;
+    *to_change = maximum_words_to_check;
     let mut to_change = state.use_long_dictionary.lock().or(Err("Failed to get lock on state!"))?;
     *to_change = use_long_dictionary;
     Ok(())
+}
+
+/// Gets the current settings
+/// # Returns
+/// `Results` with struct containing the current settings
+/// 
+/// *or String `Err` upon failure*
+#[tauri::command]
+fn get_settings(state: State<'_, AppState>) -> Result<CurrentSettings, String> {
+    let filter_letters_on_board = *state.filter_letters_on_board.lock().or(Err("Failed to get lock on state!"))?;
+    let use_long_dictionary = *state.use_long_dictionary.lock().or(Err("Failed to get lock on state!"))?;
+    let maximum_words_to_check = *state.maximum_words_to_check.lock().or(Err("Failed to get lock on state!"))?;
+    Ok(CurrentSettings { filter_letters_on_board, use_long_dictionary, maximum_words_to_check })
 }
 
 /// Async command executed by the frontend to reset the Banangrams board
@@ -1554,8 +1665,8 @@ fn main() {
     let mut all_words_long: Vec<Word> = include_str!("dictionary.txt").lines().map(convert_word_to_array).collect();
     all_words_long.sort_by(|a, b| b.len().cmp(&a.len()));
     tauri::Builder::default()
-        .manage(AppState { all_words_short, all_words_long, last_game: None.into(), filter_letters_on_board: 2.into(), maximum_words_to_check: 500_000_000.into(), use_long_dictionary: false.into() })
-        .invoke_handler(tauri::generate_handler![play_bananagrams, reset, get_playable_words, get_random_letters, set_max_words_to_check, set_max_letters_from_board, set_use_long_dictionary])
+        .manage(AppState { all_words_short, all_words_long, last_game: None.into(), filter_letters_on_board: 2.into(), maximum_words_to_check: 50_000.into(), use_long_dictionary: false.into() })
+        .invoke_handler(tauri::generate_handler![play_bananagrams, reset, get_playable_words, get_random_letters, get_settings, set_settings])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

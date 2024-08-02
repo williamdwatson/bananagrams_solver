@@ -11,6 +11,7 @@ import LetterInput from "./letter_input";
 import ResultsDisplay from "./results_display";
 import PlayableWords from "./playable_words";
 import { result_t } from "./types";
+import Settings from "./settings";
 
 export default function App() {
     const toast = useRef<Toast>(null);
@@ -23,9 +24,9 @@ export default function App() {
     const [panelSizes, setPanelSizes] = useState<number[]>([25, 75]);
 
     // Disable right-clicking elsewhere on the page
-    useEffect(() => {
-        document.addEventListener("contextmenu", e => e.preventDefault());
-    }, []);
+    // useEffect(() => {
+    //     document.addEventListener("contextmenu", e => e.preventDefault());
+    // }, []);
 
     /**
      * Runs the solver
@@ -68,6 +69,7 @@ export default function App() {
         <Splitter style={{height: "98vh"}} onResizeEnd={e => setPanelSizes(e.sizes)}>
             <SplitterPanel size={panelSizes[0]} pt={{root: {onContextMenu: e => setLetterInputContextMenu(e)}}}>
                 <LetterInput toast={toast} startRunning={startRunning} running={running} contextMenu={letterInputContextMenu} setPlayableWords={setPlayableWords} setPlayableWordsVisible={setPlayableWordsVisible} clearResults={clearResults}/>
+                <Settings toast={toast}/>
             </SplitterPanel>
             <SplitterPanel size={panelSizes[1]} style={{display: "flex", justifyContent: "center", alignItems: "center"}} pt={{root: {onContextMenu: e => setResultsContextMenu(e)}}}>
                 <ResultsDisplay toast={toast} results={results} contextMenu={resultsContextMenu} clearResults={clearResults} running={running} panelWidth={panelSizes[1]}/>

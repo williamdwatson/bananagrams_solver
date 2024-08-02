@@ -37,10 +37,10 @@ export default function PlayableWords(props: PlayableWordsProps) {
         <>
         <Dialog header="Playable words" visible={props.visible} onHide={() => props.setVisible(false)} contentStyle={{width: "35vw", maxHeight: "85vh", overflowY: "hidden"}} pt={{mask: {onContextMenu: e => e.preventDefault()}}}>
             <TabView>
-                <TabPanel header="Common words">
+                <TabPanel header="Short dictionary">
                     <PlayableWordsList playableWords={props.playableWords?.short} which="common"/>
                 </TabPanel>
-                <TabPanel header="Full Scrabble dictionary">
+                <TabPanel header="Full dictionary">
                     <PlayableWordsList playableWords={props.playableWords?.long} which="full"/>
                 </TabPanel>
             </TabView>
