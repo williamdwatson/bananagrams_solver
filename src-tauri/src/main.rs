@@ -18,6 +18,8 @@ type Word = Vec<usize>;
 type Letters = [usize; 26];
 /// Represents a board and its minimum and maximum played columns and rows
 type BoardAndIdxs = (Board, usize, usize, usize, usize);
+/// Represents a set of removable indices that will storm form a valid board, plus that new board's minimum and maximum played columns and rows
+type Removable = (Vec<(usize, usize)>, usize, usize, usize, usize);
 
 /// The maximum length of any word in the dictionary
 const MAX_WORD_LENGTH: usize = 17;
@@ -169,11 +171,17 @@ impl Board {
     /// * `board` - `Board` being undone (is modified in-place)
     /// * `played_indices` - Vector of the indices in `board` that need to be reset
     /// * `letters_on_board` - Length-26 array of the number of each letter on the board (is modified in place)
-    fn undo_play(&mut self, played_indices: &Vec<(usize, usize)>, letters_on_board: &mut Letters) {
+    /// # Returns
+    /// * `Vec<usize>` - Vector of the previous values on the `board` for each of `played_indices`
+    fn undo_play(&mut self, played_indices: &Vec<(usize, usize)>, letters_on_board: &mut Letters) -> Vec<usize> {
+        let mut old_letters: Vec<usize> = Vec::with_capacity(played_indices.len());
         for index in played_indices.iter() {
-            letters_on_board[self.get_val(index.0, index.1)] -= 1;
+            let old_val = self.get_val(index.0, index.1);
+            letters_on_board[old_val] -= 1;
+            old_letters.push(old_val);
             self.set_val(index.0, index.1, EMPTY_VALUE);
         }
+        old_letters
     }
 }
 
@@ -334,6 +342,66 @@ fn get_new_min_max(board: &Board, old_min_col: usize, old_max_col: usize, old_mi
     return (min_col, max_col, min_row, max_row);
 }
 
+fn is_connected(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, ignored_cells: &Vec<(usize, usize)>) -> bool {
+    // Create a HashSet from the ignored cells for efficient lookup
+    let ignored_cells: HashSet<_> = ignored_cells.into_iter().collect();
+
+    // Find the starting point
+    let mut start: Option<(usize, usize)> = None;
+    for row in min_row..=max_row {
+        for col in min_col..=max_col {
+            if board.get_val(row, col) != EMPTY_VALUE && !ignored_cells.contains(&(row, col)) {
+                start = Some((row, col));
+                break;
+            }
+        }
+        if start.is_some() {
+            break;
+        }
+    }
+
+    // If no starting point found, board is trivially connected
+    if start.is_none() {
+        return true;
+    }
+
+    let (start_row, start_col) = start.unwrap();
+
+    // Perform DFS to check connectivity
+    let mut visited = HashSet::new();
+    let mut stack = vec![(start_row, start_col)];
+
+    let directions = [(0, 1), (1, 0), (0, -1), (-1, 0)];
+
+    while let Some((row, col)) = stack.pop() {
+        if !visited.insert((row, col)) {
+            continue;
+        }
+
+        for (dr, dc) in &directions {
+            let new_row = (row as isize + dr) as usize;
+            let new_col = (col as isize + dc) as usize;
+
+            if new_row >= min_row && new_row <= max_row && new_col >= min_col && new_col <= max_col {
+                if board.get_val(new_row, new_col) != EMPTY_VALUE && !visited.contains(&(new_row, new_col)) && !ignored_cells.contains(&(new_row, new_col)) {
+                    stack.push((new_row, new_col));
+                }
+            }
+        }
+    }
+
+    // Check if all occupied cells are visited
+    for row in min_row..=max_row {
+        for col in min_col..=max_col {
+            if board.get_val(row, col) != EMPTY_VALUE && !ignored_cells.contains(&(row, col)) && !visited.contains(&(row, col)) {
+                return false;
+            }
+        }
+    }
+
+    true
+}
+
 /// Gets a vector of vectors of each part of a word that can be validly removed from the `board`
 /// # Arguments
 /// * `board` - The board to check for removable word parts
@@ -343,22 +411,25 @@ fn get_new_min_max(board: &Board, old_min_col: usize, old_max_col: usize, old_mi
 /// * `max_row` - The maximum played row
 /// # Returns
 /// `Vec` - Vector of length-5 tuples of (vector of length-2 index tuples of the indices of `board` that can be validly removed, new_min_col, new_max_col, new_min_row, new_max_row)
-fn get_removable_indices(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize) -> Vec<(Vec<(usize, usize)>, usize, usize, usize, usize)> {
+fn get_removable_indices(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize) -> Vec<Removable> {
     if max_col <= min_col || max_row <= min_row {
         return Vec::new();
     }
-    let mut removable: Vec<(Vec<(usize, usize)>, usize, usize, usize, usize)> = Vec::with_capacity((max_col - min_col) + (max_row - min_row));
+    let mut removable: Vec<Removable> = Vec::with_capacity((max_col - min_col) + (max_row - min_row));
     let mut board_empty = true;
     // First get horizontal removable word parts
     for row in min_row..=max_row {
         let mut current_word_part: Vec<(usize, usize)> = Vec::with_capacity(max_col-min_col);
         for col in min_col..=max_col {
-            if board.get_val(row, col) != EMPTY_VALUE && !((row != 0 && board.get_val(row-1, col) != EMPTY_VALUE) || (row != BOARD_SIZE-1 && board.get_val(row+1, col) != EMPTY_VALUE)) {
+            let touching = (row != 0 && board.get_val(row-1, col) != EMPTY_VALUE) || (row != BOARD_SIZE-1 && board.get_val(row+1, col) != EMPTY_VALUE);
+            if board.get_val(row, col) != EMPTY_VALUE && !touching {
                 current_word_part.push((row, col));
             }
             else if board.get_val(row, col) == EMPTY_VALUE && current_word_part.len() > 0 {
-                let new_min_max = get_new_min_max(board, min_col, max_col, min_row, max_row, &current_word_part);
-                removable.push((current_word_part.clone(), new_min_max.0, new_min_max.1, new_min_max.2, new_min_max.3));
+                if is_connected(board, min_col, max_col, min_row, max_row, &current_word_part) {
+                    let new_min_max = get_new_min_max(board, min_col, max_col, min_row, max_row, &current_word_part);
+                    removable.push((current_word_part.clone(), new_min_max.0, new_min_max.1, new_min_max.2, new_min_max.3));
+                }
                 current_word_part.clear();
             }
             else {
@@ -367,8 +438,10 @@ fn get_removable_indices(board: &Board, min_col: usize, max_col: usize, min_row:
             }
         }
         if current_word_part.len() > 0 {
-            let new_min_max = get_new_min_max(board, min_col, max_col, min_row, max_row, &current_word_part);
-            removable.push((current_word_part.clone(), new_min_max.0, new_min_max.1, new_min_max.2, new_min_max.3));
+            if is_connected(board, min_col, max_col, min_row, max_row, &current_word_part) {
+                let new_min_max = get_new_min_max(board, min_col, max_col, min_row, max_row, &current_word_part);
+                removable.push((current_word_part.clone(), new_min_max.0, new_min_max.1, new_min_max.2, new_min_max.3));
+            }
             current_word_part.clear();
         }
     }
@@ -383,9 +456,11 @@ fn get_removable_indices(board: &Board, min_col: usize, max_col: usize, min_row:
             if board.get_val(row, col) != EMPTY_VALUE && !((col != 0 && board.get_val(row, col-1) != EMPTY_VALUE) || (col != BOARD_SIZE-1 && board.get_val(row, col+1) != EMPTY_VALUE)) {
                 current_word_part.push((row, col));
             }
-            else if board.get_val(row, col) == EMPTY_VALUE {
-                let new_min_max = get_new_min_max(board, min_col, max_col, min_row, max_row, &current_word_part);
-                removable.push((current_word_part.clone(), new_min_max.0, new_min_max.1, new_min_max.2, new_min_max.3));
+            else if board.get_val(row, col) == EMPTY_VALUE && current_word_part.len() > 0 {
+                if is_connected(board, min_col, max_col, min_row, max_row, &current_word_part) {
+                    let new_min_max = get_new_min_max(board, min_col, max_col, min_row, max_row, &current_word_part);
+                    removable.push((current_word_part.clone(), new_min_max.0, new_min_max.1, new_min_max.2, new_min_max.3));
+                }
                 current_word_part.clear();
             }
             else {
@@ -393,8 +468,10 @@ fn get_removable_indices(board: &Board, min_col: usize, max_col: usize, min_row:
             }
         }
         if current_word_part.len() > 0 {
-            let new_min_max = get_new_min_max(board, min_col, max_col, min_row, max_row, &current_word_part);
-            removable.push((current_word_part.clone(), new_min_max.0, new_min_max.1, new_min_max.2, new_min_max.3));
+            if is_connected(board, min_col, max_col, min_row, max_row, &current_word_part) {
+                let new_min_max = get_new_min_max(board, min_col, max_col, min_row, max_row, &current_word_part);
+                removable.push((current_word_part.clone(), new_min_max.0, new_min_max.1, new_min_max.2, new_min_max.3));
+            }
             current_word_part.clear();
         }
     }
@@ -1081,6 +1158,112 @@ fn play_one_letter(board: &mut Board, min_col: usize, max_col: usize, min_row: u
     return None;
 }
 
+/// Recursively plays on an existing board by removing letters
+/// # Arguments
+/// * `board` - Existing board (will be modified in-place)
+/// * `letters_on_board` - Current letters on the `board`
+/// * `min_col` - Minimum occupied column index in `board`
+/// * `max_col` - Maximum occupied column index in `board`
+/// * `min_row` - Minimum occupied row index in `board`
+/// * `max_row` - Maximum occupied row index in `board`
+/// * `hand_letters` - Letters currently in the hand
+/// * `valid_words_vec` - Valid words that can be played on `board`
+/// * `valid_words_set` - Set of all valid words
+/// * `filter_letters_on_board` - Maximum number of letters from the board that can be used in a word
+/// * `max_words_to_check` - Maximum number of words to check
+/// * `stop_t` - AtomicBool for early stopping
+/// # Returns
+/// `Option` - either `None` if no solution was found, or a `Some` tuple of `(new_min_col, new_max_col, new_min_row, new_max_row)` on success
+fn play_removing(board: &mut Board, letters_on_board: &mut Letters, min_col: usize, max_col: usize, min_row: usize, max_row: usize, hand_letters: Letters, valid_words_vec: &Vec<&Word>, valid_words_set: &HashSet<&Word>, filter_letters_on_board: usize, max_words_to_check: usize, stop_t: &Arc<AtomicBool>) -> Option<(usize, usize, usize, usize)> {
+    let mut words_checked = 0usize;
+    // First try to play the words on the board, first horizontally and then vertically
+    for word in valid_words_vec {
+        match try_play_word_horizontal(board, word, min_col, max_col, min_row, max_row, valid_words_vec, valid_words_set, hand_letters, 0, &mut words_checked, &mut letters_on_board.clone(), filter_letters_on_board, max_words_to_check, stop_t) {
+            Ok(r) => {
+                // Ok + Some indicates that a solution was found
+                if let Some(rr) = r {
+                    // If another thread said we're done then just return None (although I *think* this isn't necessary since the return should then be an `Err`)
+                    if stop_t.load(Ordering::Relaxed) {
+                        return None;
+                    }
+                    // If we found a solution, set `stop_t` to true and return it
+                    else if rr.0 {
+                        stop_t.store(true, Ordering::Relaxed);
+                        return Some((rr.1, rr.2, rr.3, rr.4));
+                    }
+                    // Otherwise, try to play the word vertically
+                    else {
+                        match try_play_word_vertically(board, word, min_col, max_col, min_row, max_row, valid_words_vec, valid_words_set, hand_letters, 0, &mut words_checked, &mut letters_on_board.clone(), filter_letters_on_board, max_words_to_check, stop_t) {
+                            Ok(rrr) => {
+                                if let Some(rrrr) = rrr {
+                                    if stop_t.load(Ordering::Relaxed) {
+                                        return None;
+                                    }
+                                    else if rrrr.0 {
+                                        stop_t.store(true, Ordering::Relaxed);
+                                        return Some((rrrr.1, rrrr.2, rrrr.3, rrrr.4));
+                                    }
+                                }
+                            },
+                            Err(_) => {
+                                return None;
+                            }
+                        }
+                    }
+                }
+                else {
+                    match try_play_word_vertically(board, word, min_col, max_col, min_row, max_row, valid_words_vec, valid_words_set, hand_letters, 0, &mut words_checked, &mut letters_on_board.clone(), filter_letters_on_board, max_words_to_check, stop_t) {
+                        Ok(rrr) => {
+                            if let Some(rrrr) = rrr {
+                                if stop_t.load(Ordering::Relaxed) {
+                                    return None;
+                                }
+                                else if rrrr.0 {
+                                    stop_t.store(true, Ordering::Relaxed);
+                                    return Some((rrrr.1, rrrr.2, rrrr.3, rrrr.4));
+                                }
+                            }
+                        },
+                        Err(_) => {
+                            return None;
+                        }
+                    }
+                }
+            },
+            // An `Err` indicates that a thread signalled to stop
+            Err(_) => {
+                return None;
+            }
+        }
+    }
+    // If playing the word failed, find the new removable_indices and continue recursively
+    let mut removable_indices = get_removable_indices(board, min_col, max_col, min_row, max_row);
+    removable_indices.sort_unstable_by(|a, b| a.0.len().cmp(&b.0.len()));
+    for rmv in removable_indices {
+        let mut new_letters_on_board = letters_on_board.clone();
+        let prev_vals = board.undo_play(&rmv.0, &mut new_letters_on_board);
+        let mut new_hand_letters = hand_letters.clone();
+        prev_vals.iter().for_each(|p| {
+            new_hand_letters[*p] += 1;
+        });
+        // If we found a solution, return it
+        if let Some(res) = play_removing(board, &mut new_letters_on_board, rmv.1, rmv.2, rmv.3, rmv.4, new_hand_letters, valid_words_vec, valid_words_set, filter_letters_on_board, max_words_to_check, stop_t) {
+            return Some(res);
+        }
+        // If we didn't find a solution because another thread said to stop, then return None
+        else if stop_t.load(Ordering::Relaxed) {
+            return None;
+        }
+        // Otherwise undo the undo and continue to the next set of removable indices
+        else {
+            for (idx, val) in rmv.0.iter().zip(prev_vals) {
+                board.set_val(idx.0, idx.1, val);
+            }
+        }
+    }
+    None
+}
+
 /// Plays a new hand of `letters` on an existing `board`
 /// # Arguments
 /// * `old_board` - Previous board solution
@@ -1105,53 +1288,153 @@ fn play_existing(old_board: &Board, min_col: usize, max_col: usize, min_row: usi
             }
         }
     }
-    let valid_words_vec: Vec<&Word> = dict_to_use.iter().filter(|w| check_filter_after_play(hand_letters, w, &played_on_board)).collect();
-    if valid_words_vec.is_empty() {
-        return None;
-    }
-    // Split the words to check up into appropriate chunks based on the available parallelism
-    let default_parallelism_approx =  thread::available_parallelism().unwrap_or(NonZeroUsize::new(1).unwrap()).get();
-    let chunk_size = (valid_words_vec.len() as f32)/(default_parallelism_approx as f32);
-    let mut chunks: Vec<Vec<&Word>> = vec![Vec::with_capacity(chunk_size.ceil() as usize); default_parallelism_approx];
-    for (i, word) in valid_words_vec.iter().enumerate() {
-        chunks[i % default_parallelism_approx].push(word);
-    }
+    let valid_words_vec: Vec<&Word> = dict_to_use.iter().filter(|w| check_filter_after_play_later(hand_letters.clone(), old_letters_on_board.clone(), w, filter_letters_on_board)).collect();
     // Prepare for threading/early termination using `AtomicBool`
     let stop = Arc::new(AtomicBool::new(false));
+    let arc_valid_words_set = Arc::new(valid_words_set);
     let char_vec: Vec<(Board, usize, usize, usize, usize)> = Vec::new();
     let ret_val = Arc::new(Mutex::new(char_vec));
-    let arc_valid_words_vec = Arc::new(valid_words_vec);
-    let arc_valid_words_set = Arc::new(valid_words_set);
-    // For each thread (i.e. piece of available parallelism), spawn a new thread to check those words
-    // These threads check different sets of initial words in the board, and whichever finishes first signals the others to stop
+    if !valid_words_vec.is_empty() {
+        // Split the words to check up into appropriate chunks based on the available parallelism
+        let default_parallelism_approx =  thread::available_parallelism().unwrap_or(NonZeroUsize::new(1).unwrap()).get();
+        let chunk_size = (valid_words_vec.len() as f32)/(default_parallelism_approx as f32);
+        let mut chunks: Vec<Vec<&Word>> = vec![Vec::with_capacity(chunk_size.ceil() as usize); default_parallelism_approx];
+        for (i, word) in valid_words_vec.iter().enumerate() {
+            chunks[i % default_parallelism_approx].push(word);
+        }
+        let arc_valid_words_vec = Arc::new(valid_words_vec);
+        // For each thread (i.e. piece of available parallelism), spawn a new thread to check those words
+        // These threads check different sets of initial words in the board, and whichever finishes first signals the others to stop
+        thread::scope(|s| {
+            let mut handles: Vec<thread::ScopedJoinHandle<()>> = Vec::with_capacity(chunks.len());
+            for chunk in chunks {
+                let stop_t = stop.clone();
+                let new_letters = hand_letters.clone();
+                let copied_new_valid_words_vec = Arc::clone(&arc_valid_words_vec);
+                let copied_valid_words_set = Arc::clone(&arc_valid_words_set);
+                let conn = Arc::clone(&ret_val);
+                let board_cloned = old_board.clone();
+                let letters_on_board = old_letters_on_board.clone();
+                let handle = s.spawn(move || {
+                    // Loop through each word and play it on a new board
+                    let mut words_checked = 0;
+                    let mut board = board_cloned.clone();
+                    for word in chunk.iter() {
+                        match try_play_word_horizontal(&mut board, word, min_col, max_col, min_row, max_row, &copied_new_valid_words_vec, &copied_valid_words_set, new_letters, 0, &mut words_checked, &mut letters_on_board.clone(), filter_letters_on_board, max_words_to_check, &stop_t) {
+                            Ok(r) => {
+                                if let Some(rr) = r {
+                                    if stop_t.load(Ordering::Relaxed) {
+                                        break;
+                                    }
+                                    else if rr.0 {
+                                        stop_t.store(true, Ordering::Relaxed);
+                                        let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
+                                        ret.push((board, rr.1, rr.2, rr.3, rr.4));
+                                        break;
+                                    }
+                                    else {
+                                        match try_play_word_vertically(&mut board, word, min_col, max_col, min_row, max_row, &copied_new_valid_words_vec, &copied_valid_words_set, new_letters, 0, &mut words_checked, &mut letters_on_board.clone(), filter_letters_on_board, max_words_to_check, &stop_t) {
+                                            Ok(rrr) => {
+                                                if let Some(rrrr) = rrr {
+                                                    if rrrr.0 && !stop_t.load(Ordering::Relaxed) {
+                                                        stop_t.store(true, Ordering::Relaxed);
+                                                        let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
+                                                        ret.push((board, rrrr.1, rrrr.2, rrrr.3, rrrr.4));
+                                                        break;
+                                                    }
+                                                }
+                                            },
+                                            Err(_) => {
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                else {
+                                    match try_play_word_vertically(&mut board, word, min_col, max_col, min_row, max_row, &copied_new_valid_words_vec, &copied_valid_words_set, new_letters, 0, &mut words_checked, &mut letters_on_board.clone(), filter_letters_on_board, max_words_to_check, &stop_t) {
+                                        Ok(rrr) => {
+                                            if let Some(rrrr) = rrr {
+                                                if rrrr.0 && !stop_t.load(Ordering::Relaxed) {
+                                                    stop_t.store(true, Ordering::Relaxed);
+                                                    let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
+                                                    ret.push((board, rrrr.1, rrrr.2, rrrr.3, rrrr.4));
+                                                    break;
+                                                }
+                                            }
+                                        },
+                                        Err(_) => {
+                                            break;
+                                        }
+                                    }
+                                }
+                            },
+                            Err(_) => {
+                                break;
+                            }
+                        }
+                    }
+                });
+                handles.push(handle);
+            }
+            // Wait for all the threads
+            for handle in handles {
+                let _res = handle.join();
+            }
+        });    
+        // If we're done, return the result
+        let ret = ret_val.lock().expect("Failed to get lock on shared ret_val when checking return");
+        if !ret.is_empty() {
+            return Some(ret[0].clone());
+        }
+    }
+
+    // If that didn't work (or there were no valid words), try recursively looping through indices that can be removed
+    let arc_dict_to_use = Arc::new(dict_to_use);
+    let mut removable_indices = get_removable_indices(old_board, min_col, max_col, min_row, max_row);
+    removable_indices.sort_unstable_by(|a, b| a.0.len().cmp(&b.0.len()));  // Try smaller sets of removable indices first
+    let default_parallelism_approx =  thread::available_parallelism().unwrap_or(NonZeroUsize::new(1).unwrap()).get();
+    let chunk_size = (removable_indices.len() as f32)/(default_parallelism_approx as f32);
+    let mut chunks: Vec<Vec<&Removable>> = vec![Vec::with_capacity(chunk_size.ceil() as usize); default_parallelism_approx];
+    for (i, r) in removable_indices.iter().enumerate() {
+        chunks[i % default_parallelism_approx].push(r);
+    }
     thread::scope(|s| {
         let mut handles: Vec<thread::ScopedJoinHandle<()>> = Vec::with_capacity(chunks.len());
         for chunk in chunks {
             let stop_t = stop.clone();
+            let mut cloned_board = old_board.clone();
+            let letters_on_board = old_letters_on_board.clone();
             let new_letters = hand_letters.clone();
-            let copied_new_valid_words_vec = Arc::clone(&arc_valid_words_vec);
+            let copied_valid_words_vec = Arc::clone(&arc_dict_to_use);
             let copied_valid_words_set = Arc::clone(&arc_valid_words_set);
             let conn = Arc::clone(&ret_val);
-            let board_cloned = old_board.clone();
-            let letters_on_board = old_letters_on_board.clone();
             let handle = s.spawn(move || {
-                // Loop through each word and play it on a new board
-                let mut words_checked = 0;
-                let mut board = board_cloned.clone();
-                for word in chunk.iter() {
-                    let r = try_play_word_horizontal(&mut board, word, min_col, max_col, min_row, max_row, &copied_new_valid_words_vec, &copied_valid_words_set, new_letters, 0, &mut words_checked, &mut letters_on_board.clone(), filter_letters_on_board, max_words_to_check, &stop_t);
-                    match r {
-                        Ok(rr) => {
-                            if let Some(rrr) = rr {
-                                if rrr.0 && !stop_t.load(Ordering::Relaxed) {
-                                    stop_t.store(true, Ordering::Relaxed);
-                                    let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
-                                    ret.push((board, rrr.1, rrr.2, rrr.3, rrr.4));
-                                    break;
-                                }
+                for r in chunk {
+                    // "Undo" the letters that we want to remove
+                    let mut new_letters_on_board = letters_on_board.clone();
+                    let prev_letters = cloned_board.undo_play(&r.0, &mut new_letters_on_board);
+                    let mut new_hand_letters = new_letters.clone();
+                    prev_letters.iter().for_each(|p| {
+                        new_hand_letters[*p] += 1;
+                    });
+                    let valid_words_vec = copied_valid_words_vec.iter().filter(|w| check_filter_after_play_later(new_hand_letters.clone(), new_letters_on_board.clone(), w, filter_letters_on_board)).collect();
+                    // If we found a solution, set it as a solution and break (setting stop_t is performed in `play_removing`)
+                    if let Some(res) = play_removing(&mut cloned_board, &mut new_letters_on_board, r.1, r.2, r.3, r.4, new_hand_letters, &valid_words_vec, &copied_valid_words_set, filter_letters_on_board, max_words_to_check, &stop_t) {
+                        let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
+                        ret.push((cloned_board, res.0, res.1, res.2, res.3));
+                        break;
+                    }
+                    else {
+                        // Otherwise if stop_t was set, break (another thread has solved it)
+                        if stop_t.load(Ordering::Relaxed) {
+                            break;
+                        }
+                        // Othwerwise undo the undo and try with the next set of letters to remove
+                        else {
+                            for (idx, val) in r.0.iter().zip(prev_letters) {
+                                cloned_board.set_val(idx.0, idx.1, val);
                             }
-                        },
-                        Err(_) => {break;}
+                        }
                     }
                 }
             });
@@ -1161,15 +1444,13 @@ fn play_existing(old_board: &Board, min_col: usize, max_col: usize, min_row: usi
         for handle in handles {
             let _res = handle.join();
         }
-    });    
-    // If we're done, store the result in the `State` and return the result to the frontend
+    });
+    // If we're done, return the result
     let ret = ret_val.lock().expect("Failed to get lock on shared ret_val when checking return");
     if !ret.is_empty() {
         return Some(ret[0].clone());
     }
-    
-    // If that didn't work, try recursively looping through indices that can be removed
-    let removable_indices = get_removable_indices(old_board, min_col, max_col, min_row, max_row);
+    // Otherwise, return None
     None
 }
 
@@ -1660,7 +1941,7 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
 }
 
 fn main() {
-    let mut all_words_short: Vec<Word> = include_str!("new_short_dictionary.txt").lines().map(convert_word_to_array).collect();
+    let mut all_words_short: Vec<Word> = include_str!("updated_short_dictionary.txt").lines().map(convert_word_to_array).collect();
     all_words_short.sort_by(|a, b| b.len().cmp(&a.len()));
     let mut all_words_long: Vec<Word> = include_str!("dictionary.txt").lines().map(convert_word_to_array).collect();
     all_words_long.sort_by(|a, b| b.len().cmp(&a.len()));

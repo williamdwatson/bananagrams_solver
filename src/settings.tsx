@@ -68,7 +68,7 @@ export default function Settings(props: SettingsProps) {
             <div className="settings-div">
                 <label htmlFor="filter_letters_on_board">Usable letters on board:</label> <InputNumber value={filterLettersOnBoard} onChange={e => setFilterLettersOnBoard(e.value)} min={0} inputId="filter_letters_on_board"/>
                 <OverlayPanel ref={filterLettersInfo} style={{maxWidth: "33vw"}}>
-                    <p>The maximum number of letters on the board that can be used in conjuction with letters in the hand when filtering playable words.</p>
+                    <p>The maximum number of letters on the board that can be used in conjuction with letters in the hand when filtering playable words</p>
                     <p><strong>Lower values:</strong> <em>Usually</em> faster solutions</p>
                     <p><strong>Higher values:</strong> <em>Usually</em> slower solutions, but more likely to find a solution if one exists. For an exhaustive search, use a value greater than the total number of letters.</p>
                 </OverlayPanel>
@@ -77,7 +77,7 @@ export default function Settings(props: SettingsProps) {
             <div className="settings-div">
                 <label htmlFor="max_words_to_check">Maximum iterations:</label> <InputNumber value={maximumWordsToCheck} onChange={e => setMaximumWordsToCheck(e.value)} min={0} inputId="max_words_to_check"/>
                 <OverlayPanel ref={maxWordsInfo} style={{maxWidth: "33vw"}}>
-                    <p>The maximum number of iterations before the solver stops and returns no solution (i.e. a "dump").</p>
+                    <p>The maximum number of iterations before the solver stops and returns no solution (i.e. a "dump")</p>
                     <p><strong>Lower values:</strong> Faster "dump" solutions</p>
                     <p><strong>Higher values:</strong> Slower "dump" solutions, but more likely to find a solution if one exists. For an exhaustive search, use a very large value.</p>
                 </OverlayPanel>
@@ -86,8 +86,8 @@ export default function Settings(props: SettingsProps) {
             <div className="settings-div">
                 <label htmlFor="use_dictionary">Dictionary:</label> <Dropdown value={whichDictionary} onChange={e => setWhichDictionary(e.value)} options={["Short", "Full"]} inputId="use_dictionary"/>
                 <OverlayPanel ref={whichDictionaryInfo} style={{maxWidth: "33vw"}}>
-                    <p>Which dictionary to use.</p>
-                    <p><strong>Short:</strong> Contains 18,180 words</p>
+                    <p>Which dictionary to use</p>
+                    <p><strong>Short:</strong> Contains 30,522 words</p>
                     <p><strong>Full:</strong> Contains 178,691 words, including some that some players might consider questionable</p>
                 </OverlayPanel>
                 <i className="pi pi-info-circle info-overlay" onClick={e => whichDictionaryInfo.current?.toggle(e)}></i>
