@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, MouseEvent, RefObject } from "react";
+import { useEffect, useRef, useState, MouseEvent, RefObject, ReactElement } from "react";
 import { Button } from "primereact/button";
 import { confirmDialog } from "primereact/confirmdialog";
 import { ContextMenu } from "primereact/contextmenu";
@@ -11,6 +11,7 @@ import { readText, writeText } from "@tauri-apps/api/clipboard";
 import { invoke } from "@tauri-apps/api/tauri";
 import { Dropdown } from "primereact/dropdown";
 import { TabPanel, TabView } from "primereact/tabview";
+import { result_t } from "./types";
 
 interface LetterInputProps {
     /**
@@ -27,23 +28,44 @@ interface LetterInputProps {
      */
     running: boolean,
     /**
-    * Mouse event for a right-click in the letter input SplitterPanel
-    */
-   contextMenu: MouseEvent<HTMLDivElement>|null,
-   /**
-    * Sets the list of words that can be played given the tiles in the hand
-    * @param words Which words can be played
-    */
-   setPlayableWords: (words: {short: string[], long: string[]}) => void,
-   /**
-    * Sets whether the visible words popup should be visible
-    * @param visible Whether the popup should be visible
-    */
-   setPlayableWordsVisible: (visible: boolean) => void,
+     * Mouse event for a right-click in the letter input SplitterPanel
+     */
+    contextMenu: MouseEvent<HTMLDivElement>|null,
+    /**
+     * Sets the list of words that can be played given the tiles in the hand
+     * @param words Which words can be played
+     */
+    setPlayableWords: (words: {short: string[], long: string[]}) => void,
+    /**
+     * Sets whether the visible words popup should be visible
+     * @param visible Whether the popup should be visible
+     */
+    setPlayableWordsVisible: (visible: boolean) => void,
     /**
      * Function to clear the board's results
      */
-   clearResults: () => void
+    clearResults: () => void,
+    /**
+     * Whether an undo can be performed
+     */
+    undoPossible: boolean,
+    /**
+     * Whether a redo can be performed
+     */
+    redoPossible: boolean,
+    /**
+     * Sets whether an undo can be performed
+     */
+    setUndoPossible: (possible: boolean) => void,
+    /**
+     * Sets whether a redo can be performed
+     */
+    setRedoPossible: (possible: boolean) => void,
+    /**
+     * Sets the results (for undoing and redoing)
+     * @param results The undone/redone results
+     */
+    setResults: (results: result_t|null) => void
 }
 
 /**
@@ -69,7 +91,7 @@ export default function LetterInput(props: LetterInputProps){
     const invalid = new Map<string, boolean>();
     const how_many = [13, 3, 3, 6, 18, 3, 4, 3, 12, 2, 2, 5, 3, 8, 11, 3, 2, 9, 6, 9, 6, 3, 3, 2, 3, 2];
     const individual_cm_refs: RefObject<ContextMenu>[] = [];
-    const individual_cms: any[] = [];
+    const individual_cms: ReactElement<ContextMenu>[] = [];
     UPPERCASE.forEach((c, i) => {
         m.set(c, 0);
         num_letters.set(c, how_many[i]);
@@ -471,6 +493,41 @@ export default function LetterInput(props: LetterInputProps){
             props.startRunning(letters);
         }
     }
+
+    /**
+     * Performs an undo
+     */
+    const undo = () => {
+        invoke("undo").then((res: any) => {
+            const new_map = new Map<string, number>();
+            UPPERCASE.forEach(c => {
+                new_map.set(c, res.letters[c] ?? 0);
+            });
+            setLetterNums(new_map);
+            props.setUndoPossible(res.undo_possible);
+            props.setRedoPossible(res.redo_possible);
+            props.setResults(res.solution.length > 0 ? { elapsed: 0, board: res.solution } : null);
+        })
+        .catch(err => props.toast.current?.show({severity: "error", summary: "Could not undo", detail: err.toString()}));
+    }
+
+    /**
+     * Performs a redo
+     */
+    const redo = () => {
+        invoke("redo").then((res: any) => {
+            console.log(res);
+            const new_map = new Map<string, number>();
+            UPPERCASE.forEach(c => {
+                new_map.set(c, res.letters[c] ?? 0);
+            });
+            setLetterNums(new_map);
+            props.setUndoPossible(res.undo_possible);
+            props.setRedoPossible(res.redo_possible);
+            props.setResults(res.solution.length > 0 ? { elapsed: 0, board: res.solution } : null);
+        })
+        .catch(err => props.toast.current?.show({severity: "error", summary: "Could not undo", detail: err.toString()}));
+    }
     
     return (
         <>
@@ -484,8 +541,8 @@ export default function LetterInput(props: LetterInputProps){
                     <form onSubmit={e => {e.preventDefault(); useLetters()}} autoComplete="off">
                         <InputText value={typedIn} onChange={e => setTypedIn(e.target.value.toUpperCase())} keyfilter="alpha" id="typeIn" onContextMenu={e => type_in_cm.current?.show(e)}/>
                         <br/>
-                        <Button type="submit" label="Use letters" style={{marginTop: "5px", marginRight: "5px"}}/>
-                        <Button type="reset" label="Cancel" severity="secondary" onClick={() => cancelInput()}/>
+                        <Button type="submit" label="Use letters" icon="pi pi-arrow-right" iconPos="right" style={{marginTop: "5px", marginRight: "5px"}}/>
+                        <Button type="reset" label="Cancel" icon="pi pi-times" iconPos="right" severity="secondary" onClick={() => cancelInput()}/>
                     </form>
                 </TabPanel>
                 <TabPanel header="Choose randomly">
@@ -495,8 +552,8 @@ export default function LetterInput(props: LetterInputProps){
                         <span> random letters from </span>
                         <Dropdown value={randomFrom} onChange={e => setRandomFrom(e.value)} options={["standard Bananagrams", "double Bananagrams", "infinite set"]}/>
                         <br/>
-                        <Button type="submit" label="Choose letters" style={{marginTop: "5px", marginRight: "5px"}}/>
-                        <Button type="reset" label="Cancel" severity="secondary" onClick={() => cancelInput()}/>
+                        <Button type="submit" label="Choose letters" icon="pi pi-arrow-right" iconPos="right" style={{marginTop: "5px", marginRight: "5px"}}/>
+                        <Button type="reset" label="Cancel" icon="pi pi-times" iconPos="right" severity="secondary" onClick={() => cancelInput()}/>
                     </form>
                 </TabPanel>
             </TabView>            
@@ -513,12 +570,16 @@ export default function LetterInput(props: LetterInputProps){
         </div>
         <br/>
         <div className="button-div">
-            <Button type="button" label="Input letters" style={{padding: "8px", marginTop: "5px", marginRight: "2%"}} onClick={() => setTypeInVisible(true)}/>
-            <Button type="button" label="View playable words" icon="pi pi-book" iconPos="right" style={{padding: "8px", marginTop: "5px"}} onClick={viewPlayableWords} loading={playableWordsLoading}/>
+            <Button type="button" label="Input letters" icon="pi pi-book" iconPos="right" style={{padding: "8px", marginRight: "2%"}} onClick={() => setTypeInVisible(true)}/>
+            <Button type="button" label="View playable words" icon="pi pi-eye" iconPos="right" style={{padding: "8px",}} onClick={viewPlayableWords} loading={playableWordsLoading}/>
         </div>
         <div className="button-div">
-            <Dropdown placeholder="Reset" options={["Reset hand", "Reset board"]} style={{marginTop: "5px", marginRight: "2%"}} onChange={e => doReset(e.value)} className="reset-dropdown" panelClassName="reset-dropdown" pt={{input: {style: {color: "white"}}, item: {className: "reset-dropdown-item"}, trigger: {style: {color: "white"}}}}/>
-            <Button type="button" label="Solve" icon="pi pi-arrow-right" iconPos="right" style={{marginTop: "5px"}} severity="success" onClick={solve} loading={props.running}/>
+            <Dropdown placeholder="Reset" options={["Reset hand", "Reset board"]} style={{marginRight: "2%"}} onChange={e => doReset(e.value)} className="reset-dropdown" panelClassName="reset-dropdown" pt={{input: {style: {color: "white"}}, item: {className: "reset-dropdown-item"}, trigger: {style: {color: "white"}}}}/>
+            <Button type="button" label="Solve" icon="pi pi-arrow-right" iconPos="right" severity="success" onClick={solve} loading={props.running}/>
+        </div>
+        <div className="button-div" style={{marginTop: "15px"}}>
+            <Button label="Undo" icon="pi pi-undo" iconPos="right" onClick={undo} style={{marginRight: "2%"}} disabled={!props.undoPossible}/>
+            <Button label="Redo" icon="pi pi-refresh" iconPos="right" onClick={redo} disabled={!props.redoPossible}/>
         </div>
         </>
     )

@@ -1,7 +1,8 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{cmp, fmt, mem, thread, usize, collections::HashMap};
+use std::num::NonZeroUsize;
+use std::{fmt, thread, usize, collections::HashMap};
 use hashbrown::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -15,11 +16,13 @@ use tauri::State;
 type Word = Vec<usize>;
 /// Represents a hand of letters
 type Letters = [usize; 26];
-/// Represents the previous sequence of plays
-type PlaySequence = Vec<(Word, (usize, usize, Direction))>;
+/// Represents a board and its minimum and maximum played columns and rows
+type BoardAndIdxs = (Board, usize, usize, usize, usize);
+/// Represents a set of removable indices that will storm form a valid board, plus that new board's minimum and maximum played columns and rows
+type Removable = (Vec<(usize, usize)>, usize, usize, usize, usize);
 
 /// The maximum length of any word in the dictionary
-const MAX_WORD_LENGTH: usize = 15;
+const MAX_WORD_LENGTH: usize = 17;
 /// Value of an empty cell on the board
 const EMPTY_VALUE: usize = 30;
 /// Number rows/columns in the board
@@ -29,10 +32,10 @@ const UPPERCASE: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 /// The number of each letter present in regular Bananagrams
 const REGULAR_TILES: [u64; 26] = [13, 3, 3, 6, 18, 3, 4, 3, 12, 2, 2, 5, 3, 8, 11, 3, 2, 9, 6, 9, 6, 3, 3, 2, 3, 2];
 
-/// A thin wrapper for handling the board
+/// The current board
 #[derive(Clone)]
 struct Board {
-    /// The underlying vector of the board (as in optimization level 0 the array overflows the stack)
+    /// The underlying vector of the board
     arr: Vec<usize>
 }
 impl Board {
@@ -41,24 +44,144 @@ impl Board {
         return Board { arr: vec![EMPTY_VALUE; BOARD_SIZE*BOARD_SIZE] }
     }
 
-    /// Unsafely gets a value from the board at the given index
+    /// Gets a value from the board at the given index
     /// # Arguments
     /// * `row` - Row index of the value to get (must be less than `BOARD_SIZE`)
     /// * `col` - Column index of the value to get (must be less than `BOARD_SIZE`)
     /// # Returns
-    /// `usize` - The value in the board at `(row, col)` (if either `row` or `col` are greater than `BOARD_SIZE` this will be undefined behavior)
+    /// `usize` - The value in the board at `(row, col)`
+    /// # Panics
+    /// If `row` or `col` are out-of-bounds
     fn get_val(&self, row: usize, col: usize) -> usize {
-        return unsafe { *self.arr.get_unchecked(row*BOARD_SIZE + col) };
+        return *self.arr.get(row*BOARD_SIZE + col).expect("Index not in range!");
     }
 
-    /// Unsafely sets a value in the board at the given index
+    /// Sets a value in the board at the given index
     /// # Arguments
     /// * `row` - Row index of the value to get (must be less than `BOARD_SIZE`)
     /// * `col` - Column index of the value to get (must be less than `BOARD_SIZE`)
-    /// * `val` - Value to set at `(row, col)` in the board (if either `row` or `col` are greater than `BOARD_SIZE` this will be undefined behavior)
+    /// * `val` - Value to set at `(row, col)` in the board
+    /// # Panics
+    /// If `row` or `col` are out-of-bounds
     fn set_val(&mut self, row: usize, col: usize, val: usize) {
-        let v = unsafe { self.arr.get_unchecked_mut(row*BOARD_SIZE + col) };
+        let v = self.arr.get_mut(row*BOARD_SIZE + col).expect("Index not in range!");
         *v = val;
+    }
+
+    /// Plays a word on the board
+    /// # Arguments
+    /// * `word` - The word to be played
+    /// * `row_idx` - The starting row at which to play the word
+    /// * `col_idx` - The starting column at which to play the word
+    /// * `direction` - The `Direction` in which to play the word
+    /// * `letters` - The number of each letter currently in the hand
+    /// * `letters_on_board` - The number of each letter on the board (is modified in-place)
+    /// # Returns
+    /// *`Result` with:*
+    /// * `bool` - Whether the word could be validly played
+    /// * `Vec<(usize, usize)>` - Vector of the indices played in `board`
+    /// * `[usize; 26]`- The remaining letters
+    /// * `LetterUsage` - How many letters were used
+    /// 
+    /// *or empty `Err` if out-of-bounds*
+    fn play_word(&mut self, word: &Word, row_idx: usize, col_idx: usize, direction: Direction, letters: &Letters, letters_on_board: &mut Letters) -> (bool, Vec<(usize, usize)>, [usize; 26], LetterUsage) {
+        let mut played_indices: Vec<(usize, usize)> = Vec::with_capacity(MAX_WORD_LENGTH);
+        match direction {
+            Direction::Horizontal => {
+                let mut remaining_letters = letters.clone();
+                if col_idx + word.len() >= BOARD_SIZE {
+                    return (false, played_indices, remaining_letters, LetterUsage::Remaining);
+                }
+                // Check if the word will start or end at a letter
+                let mut valid_loc = (col_idx != 0 && self.get_val(row_idx, col_idx-1) != EMPTY_VALUE) || (BOARD_SIZE-col_idx <= word.len() && self.get_val(row_idx, col_idx+word.len()) != EMPTY_VALUE);
+                // Check if the word will border any letters on the top or bottom
+                valid_loc |= (col_idx..col_idx+word.len()).any(|c_idx| (row_idx < BOARD_SIZE-1 && self.get_val(row_idx+1, c_idx) != EMPTY_VALUE) || (row_idx > 0 && self.get_val(row_idx-1, c_idx) != EMPTY_VALUE));
+                if !valid_loc {
+                    return (false, played_indices, remaining_letters, LetterUsage::Remaining);
+                }
+                else {
+                    let mut entirely_overlaps = true;
+                    for i in 0..word.len() {
+                        if self.get_val(row_idx, col_idx+i) == EMPTY_VALUE {
+                            self.set_val(row_idx, col_idx+i, word[i]);
+                            letters_on_board[word[i]] += 1;
+                            played_indices.push((row_idx, col_idx+i));
+                            entirely_overlaps = false;
+                            let elem = remaining_letters.get_mut(word[i]).unwrap();
+                            if *elem == 0 {
+                                return (false, played_indices, remaining_letters, LetterUsage::Overused);
+                            }
+                            *elem -= 1;
+                        }
+                        else if self.get_val(row_idx, col_idx+i) != word[i] {
+                            return (false, played_indices, remaining_letters, LetterUsage::Remaining);
+                        }
+                    }
+                    if remaining_letters.iter().all(|count| *count == 0) && !entirely_overlaps {
+                        return (true, played_indices, remaining_letters, LetterUsage::Finished);
+                    }
+                    else {
+                        return (!entirely_overlaps, played_indices, remaining_letters, LetterUsage::Remaining);
+                    }
+                }
+            },
+            Direction::Vertical => {
+                let mut remaining_letters = letters.clone();
+                if row_idx + word.len() >= BOARD_SIZE {
+                    return (false, played_indices, remaining_letters, LetterUsage::Remaining);
+                }
+                // Check if the word will start or end at a letter
+                let mut valid_loc = (row_idx != 0 && self.get_val(row_idx-1, col_idx) != EMPTY_VALUE) || (BOARD_SIZE-row_idx <= word.len() && self.get_val(row_idx+word.len(), col_idx) != EMPTY_VALUE);
+                // Check if the word will border any letters on the right or left
+                valid_loc |= (row_idx..row_idx+word.len()).any(|r_idx| (col_idx < BOARD_SIZE-1 && self.get_val(r_idx, col_idx+1) != EMPTY_VALUE) || (col_idx > 0 && self.get_val(r_idx, col_idx-1) != EMPTY_VALUE));
+                if !valid_loc {
+                    return (false, played_indices, remaining_letters, LetterUsage::Remaining);
+                }
+                else {
+                    let mut entirely_overlaps = true;
+                    for i in 0..word.len() {
+                        if self.get_val(row_idx+i, col_idx) == EMPTY_VALUE {
+                            self.set_val(row_idx+i, col_idx, word[i]);
+                            letters_on_board[word[i]] += 1;
+                            played_indices.push((row_idx+i, col_idx));
+                            entirely_overlaps = false;
+                            let elem = remaining_letters.get_mut(word[i]).unwrap();
+                            if *elem == 0 {
+                                return (false, played_indices, remaining_letters, LetterUsage::Overused);
+                            }
+                            *elem -= 1;
+                        }
+                        else if self.get_val(row_idx+i, col_idx) != word[i] {
+                            return (false, played_indices, remaining_letters, LetterUsage::Remaining);
+                        }
+                    }
+                    if remaining_letters.iter().all(|count| *count == 0) && !entirely_overlaps {
+                        return (true, played_indices, remaining_letters, LetterUsage::Finished);
+                    }
+                    else {
+                        return (!entirely_overlaps, played_indices, remaining_letters, LetterUsage::Remaining);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Undoes a play on the `board`
+    /// # Arguments
+    /// * `board` - `Board` being undone (is modified in-place)
+    /// * `played_indices` - Vector of the indices in `board` that need to be reset
+    /// * `letters_on_board` - Length-26 array of the number of each letter on the board (is modified in place)
+    /// # Returns
+    /// * `Vec<usize>` - Vector of the previous values on the `board` for each of `played_indices`
+    fn undo_play(&mut self, played_indices: &Vec<(usize, usize)>, letters_on_board: &mut Letters) -> Vec<usize> {
+        let mut old_letters: Vec<usize> = Vec::with_capacity(played_indices.len());
+        for index in played_indices.iter() {
+            let old_val = self.get_val(index.0, index.1);
+            letters_on_board[old_val] -= 1;
+            old_letters.push(old_val);
+            self.set_val(index.0, index.1, EMPTY_VALUE);
+        }
+        old_letters
     }
 }
 
@@ -95,8 +218,8 @@ fn convert_array_to_word(arr: &Word) -> String {
 /// * `String` - `board` in string form (with all numbers converted to letters)
 fn _board_to_string(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize) -> String {
     let mut board_string: Vec<char> = Vec::with_capacity((max_row-min_row)*(max_col-min_col));
-    for row in min_row..max_row+1 {
-        for col in min_col..max_col+1 {
+    for row in min_row..=max_row {
+        for col in min_col..=max_col {
             if board.get_val(row, col) == EMPTY_VALUE {
                 board_string.push(' ');
             }
@@ -121,9 +244,9 @@ fn _board_to_string(board: &Board, min_col: usize, max_col: usize, min_row: usiz
 /// * `Vec<Vec<char>>` - `board` in vector form (with all numbers converted to letters)
 fn board_to_vec(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, previous_idxs: &HashSet<(usize, usize)>) -> Vec<Vec<String>> {
     let mut board_vec: Vec<Vec<String>> = Vec::with_capacity(max_row-min_row);
-    for row in min_row..max_row+1 {
+    for row in min_row..=max_row {
         let mut row_vec: Vec<String> = Vec::with_capacity(max_col-min_col);
-        for col in min_col..max_col+1 {
+        for col in min_col..=max_col {
             if board.get_val(row, col) == EMPTY_VALUE {
                 row_vec.push(' '.to_string());
             }
@@ -141,34 +264,231 @@ fn board_to_vec(board: &Board, min_col: usize, max_col: usize, min_row: usize, m
     return board_vec;
 }
 
-/// Gets which indices overlap between `previous_play_sequence` and `new_play_sequence`
+/// Gets which indices overlap between `previous_board` and `new_board`
 /// # Arguments
-/// * `previous_play_sequence` - The play sequence the last time the board was played
-/// * `new_play_sequence` - The new play sequence whose overlap is being compared with `previous_play_sequence`
+/// * `previous_board` - The previous board
+/// * `new_board` - The new board
+/// * `previous_min_col` - The minimum played column in `previous_board`
+/// * `previous_max_col` - The maximum played column in `previous_board`
+/// * `previous_min_row` - The minimum played row in `previous_board`
+/// * `previous_max_row` - The maximum played row in `previous_board`
+/// * `new_min_col` - The minimum played column in `new_board`
+/// * `new_max_col` - The maximum played column in `new_board`
+/// * `new_min_row` - The minimum played row in `new_board`
+/// * `new_max_row` - The maximum played row in `new_board`
 /// # Returns
-/// `previous_idxs` - HashSet of the indices in the board where each overlapping letter between the two sequences was played; may be empty
-fn get_previous_idxs(previous_play_sequence: &PlaySequence, new_play_sequence: &PlaySequence) -> HashSet<(usize, usize)> {
-    let mut previous_idxs: HashSet<(usize, usize)> = HashSet::new();
-    for i in 0..cmp::min(previous_play_sequence.len(), new_play_sequence.len()) {
-        if previous_play_sequence[i] == new_play_sequence[i] {
-            let word_len = previous_play_sequence[i].0.len();
-            let start_row = previous_play_sequence[i].1.0;
-            let start_col = previous_play_sequence[i].1.1;
-            match previous_play_sequence[i].1.2 {
-                Direction::Horizontal => {
-                    for j in 0..word_len {
-                        previous_idxs.insert((start_row, start_col+j));
-                    }
-                },
-                Direction::Vertical => {
-                    for j in 0..word_len {
-                        previous_idxs.insert((start_row+j, start_col));
-                    }
+/// `HashSet` - Set of the indices where `previous_board` and `new_board` have the same value
+fn get_board_overlap(previous_board: &Board, new_board: &Board, previous_min_col: usize, previous_max_col: usize, previous_min_row: usize, previous_max_row: usize, new_min_col: usize, new_max_col: usize, new_min_row: usize, new_max_row: usize) -> HashSet<(usize, usize)> {
+    let mut overlapping_idxs: HashSet<(usize, usize)> = HashSet::new();
+    for row in previous_min_row.max(new_min_row)..=previous_max_row.min(new_max_row) {
+        for col in previous_min_col.max(new_min_col)..=previous_max_col.min(new_max_col) {
+            if previous_board.get_val(row, col) != EMPTY_VALUE && previous_board.get_val(row, col) == new_board.get_val(row, col) {
+                overlapping_idxs.insert((row, col));
+            }
+        }
+    }
+    return overlapping_idxs;
+}
+
+/// Gets the minimum and maximum occupied row and column from a `board` (assuming that tiles have only been removed)
+/// # Arguments
+/// * `board` - The `Board` to check
+/// * `old_min_col` - The previous mimimum occupied column
+/// * `old_max_col` - The previous maximum occupied column
+/// * `old_min_row` - The previous minimum occupied row
+/// * `old_max_row` - The previous maximum occupied row
+/// * `except_vec` - Vector of indices to ignore when checking if occupied
+/// # Returns
+/// * `usize` - New minimum occupied column (never smaller than `old_min_col`)
+/// * `usize` - New maximum occupied column (never greater than `old_min_row`)
+/// * `usize` - New minimum occupied row (never smaller than `old_min_row`)
+/// * `usize` - New maximum occupied row (never greater than `old_max_row`)
+fn get_new_min_max(board: &Board, old_min_col: usize, old_max_col: usize, old_min_row: usize, old_max_row: usize, except_vec: &Vec<(usize, usize)>) -> (usize, usize, usize, usize) {
+    let mut except_idxs: HashSet<&(usize, usize)> = HashSet::with_capacity(except_vec.len());
+    for idxs in except_vec {
+        except_idxs.insert(idxs);
+    }
+    // Start at the old minimum row and check if that row or any subsequent ones have any non-empty values
+    let mut min_row = old_min_row;
+    for row in old_min_row..=old_max_row {
+        if (old_min_col..old_max_col).any(|col| !except_idxs.contains(&(row, col)) && board.get_val(row, col) != EMPTY_VALUE) {
+            break;
+        }
+        min_row += 1;
+    }
+    // Start at the test max_row and work our way down
+    let mut max_row = old_max_row;
+    while max_row > min_row {
+        if (old_min_col..old_max_col).any(|col| !except_idxs.contains(&(max_row, col)) && board.get_val(max_row, col) != EMPTY_VALUE) {
+            break;
+        }
+        max_row -= 1;
+    }
+    // Now do down columns
+    let mut min_col = old_min_col;
+    for col in old_min_col..=old_max_col {
+        if (min_row..max_row).any(|row| !except_idxs.contains(&(row, col)) && board.get_val(row, col) != EMPTY_VALUE) {
+            break;
+        }
+        min_col += 1;
+    }
+    let mut max_col = old_max_col;
+    while max_col > min_col {
+        if (min_row..max_row).any(|row| !except_idxs.contains(&(row, max_col)) && board.get_val(row, max_col) != EMPTY_VALUE) {
+            break;
+        }
+        max_col -= 1;
+    }
+    return (min_col, max_col, min_row, max_row);
+}
+
+/// Checks whether the `board` is fully connected; this code is mostly from ChatGPT
+/// # Arguments
+/// * `board` - Board to check
+/// * `min_col` - The minimum played column
+/// * `max_col` - The maximum played column
+/// * `min_row` - The minimum played row
+/// * `max_row` - The maximum played row
+/// * `ignore_cells` - Locations to ignore
+/// # Returns
+/// * `bool` - Whether `board` is fully connected
+fn is_connected(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, ignored_cells: &Vec<(usize, usize)>) -> bool {
+    // Create a HashSet from the ignored cells for efficient lookup
+    let ignored_cells: HashSet<_> = ignored_cells.into_iter().collect();
+
+    // Find the starting point
+    let mut start: Option<(usize, usize)> = None;
+    for row in min_row..=max_row {
+        for col in min_col..=max_col {
+            if board.get_val(row, col) != EMPTY_VALUE && !ignored_cells.contains(&(row, col)) {
+                start = Some((row, col));
+                break;
+            }
+        }
+        if start.is_some() {
+            break;
+        }
+    }
+
+    // If no starting point found, board is trivially connected
+    if start.is_none() {
+        return true;
+    }
+
+    let (start_row, start_col) = start.unwrap();
+
+    // Perform DFS to check connectivity
+    let mut visited = HashSet::new();
+    let mut stack = vec![(start_row, start_col)];
+
+    let directions = [(0, 1), (1, 0), (0, -1), (-1, 0)];
+
+    while let Some((row, col)) = stack.pop() {
+        if !visited.insert((row, col)) {
+            continue;
+        }
+
+        for (dr, dc) in &directions {
+            let new_row = (row as isize + dr) as usize;
+            let new_col = (col as isize + dc) as usize;
+
+            if new_row >= min_row && new_row <= max_row && new_col >= min_col && new_col <= max_col {
+                if board.get_val(new_row, new_col) != EMPTY_VALUE && !visited.contains(&(new_row, new_col)) && !ignored_cells.contains(&(new_row, new_col)) {
+                    stack.push((new_row, new_col));
                 }
             }
         }
     }
-    return previous_idxs;
+
+    // Check if all occupied cells are visited
+    for row in min_row..=max_row {
+        for col in min_col..=max_col {
+            if board.get_val(row, col) != EMPTY_VALUE && !ignored_cells.contains(&(row, col)) && !visited.contains(&(row, col)) {
+                return false;
+            }
+        }
+    }
+
+    true
+}
+
+/// Gets a vector of vectors of each part of a word that can be validly removed from the `board`
+/// # Arguments
+/// * `board` - The board to check for removable word parts
+/// * `min_col` - The minimum played column
+/// * `max_col` - The maximum played column
+/// * `min_row` - The minimum played row
+/// * `max_row` - The maximum played row
+/// # Returns
+/// `Vec` - Vector of length-5 tuples of (vector of length-2 index tuples of the indices of `board` that can be validly removed, new_min_col, new_max_col, new_min_row, new_max_row)
+fn get_removable_indices(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize) -> Vec<Removable> {
+    if max_col <= min_col || max_row <= min_row {
+        return Vec::new();
+    }
+    let mut removable: Vec<Removable> = Vec::with_capacity((max_col - min_col) + (max_row - min_row));
+    let mut board_empty = true;
+    // First get horizontal removable word parts
+    for row in min_row..=max_row {
+        let mut current_word_part: Vec<(usize, usize)> = Vec::with_capacity(max_col-min_col);
+        for col in min_col..=max_col {
+            let touching = (row != 0 && board.get_val(row-1, col) != EMPTY_VALUE) || (row != BOARD_SIZE-1 && board.get_val(row+1, col) != EMPTY_VALUE);
+            if board.get_val(row, col) != EMPTY_VALUE && !touching {
+                current_word_part.push((row, col));
+            }
+            else if board.get_val(row, col) == EMPTY_VALUE && current_word_part.len() > 0 {
+                if is_connected(board, min_col, max_col, min_row, max_row, &current_word_part) {
+                    let new_min_max = get_new_min_max(board, min_col, max_col, min_row, max_row, &current_word_part);
+                    removable.push((current_word_part.clone(), new_min_max.0, new_min_max.1, new_min_max.2, new_min_max.3));
+                }
+                current_word_part.clear();
+            }
+            else {
+                // There's a non-empty value that didn't get removed (so there's still something on the board)
+                board_empty = false;
+            }
+        }
+        if current_word_part.len() > 0 {
+            if is_connected(board, min_col, max_col, min_row, max_row, &current_word_part) {
+                let new_min_max = get_new_min_max(board, min_col, max_col, min_row, max_row, &current_word_part);
+                removable.push((current_word_part.clone(), new_min_max.0, new_min_max.1, new_min_max.2, new_min_max.3));
+            }
+            current_word_part.clear();
+        }
+    }
+    // If the board is empty, that means there was only a single horizontal word that got removed
+    if removable.len() == 1 && board_empty {
+        return Vec::new();
+    }
+    // Then get vertical removable word parts
+    for col in min_col..=max_col {
+        let mut current_word_part: Vec<(usize, usize)> = Vec::with_capacity(max_col-min_col);
+        for row in min_row..=max_row {
+            if board.get_val(row, col) != EMPTY_VALUE && !((col != 0 && board.get_val(row, col-1) != EMPTY_VALUE) || (col != BOARD_SIZE-1 && board.get_val(row, col+1) != EMPTY_VALUE)) {
+                current_word_part.push((row, col));
+            }
+            else if board.get_val(row, col) == EMPTY_VALUE && current_word_part.len() > 0 {
+                if is_connected(board, min_col, max_col, min_row, max_row, &current_word_part) {
+                    let new_min_max = get_new_min_max(board, min_col, max_col, min_row, max_row, &current_word_part);
+                    removable.push((current_word_part.clone(), new_min_max.0, new_min_max.1, new_min_max.2, new_min_max.3));
+                }
+                current_word_part.clear();
+            }
+            else {
+                board_empty = false;
+            }
+        }
+        if current_word_part.len() > 0 {
+            if is_connected(board, min_col, max_col, min_row, max_row, &current_word_part) {
+                let new_min_max = get_new_min_max(board, min_col, max_col, min_row, max_row, &current_word_part);
+                removable.push((current_word_part.clone(), new_min_max.0, new_min_max.1, new_min_max.2, new_min_max.3));
+            }
+            current_word_part.clear();
+        }
+    }
+    if board_empty {
+        return Vec::new();
+    }
+    return removable;
 }
 
 /// Checks whether a `word` can be made using the given `letters`
@@ -177,13 +497,13 @@ fn get_previous_idxs(previous_play_sequence: &PlaySequence, new_play_sequence: &
 /// * `letters` - Length-26 array of the number of each letter in the hand
 /// # Returns
 /// * `bool` - Whether `word` can be made using `letters`
-fn is_makeable(word: &Word, letters: Letters) -> bool {
+fn is_makeable(word: &Word, letters: &Letters) -> bool {
     let mut available_letters = letters.clone();
     for letter in word.iter() {
-        if unsafe { available_letters.get_unchecked(*letter) } == &0 {
+        if available_letters.get(*letter).unwrap() == &0 {
             return false;
         }
-        let elem = unsafe { available_letters.get_unchecked_mut(*letter) };
+        let elem = available_letters.get_mut(*letter).unwrap();
         *elem -= 1;
     }
     return true;
@@ -203,15 +523,26 @@ fn is_makeable(word: &Word, letters: Letters) -> bool {
 /// * `valid_words` - HashSet of all valid words as `Vec<usize>`s
 /// # Returns
 /// `bool` - whether the given `board` is made only of valid words
-fn is_board_valid_horizontal(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, row: usize, start_col: usize, end_col: usize, valid_words: &HashSet<Word>) -> bool {
+fn is_board_valid_horizontal(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, row: usize, start_col: usize, end_col: usize, valid_words: &HashSet<&Word>) -> bool {
     let mut current_letters: Vec<usize> = Vec::with_capacity(MAX_WORD_LENGTH);
+    // Find the furthest left column that the new play is connected to
+    let mut minimum_col = start_col;
+    while minimum_col > min_col {
+        if board.get_val(row, minimum_col) == EMPTY_VALUE {
+            minimum_col += 1;
+            break;
+        }
+        minimum_col -= 1;
+    }
+    minimum_col = minimum_col.max(min_col);
     // Check across the row where the word was played
-    for col_idx in min_col..max_col+1 {
+    for col_idx in minimum_col..=max_col {
         // If we're not at an empty square, add it to the current word we're looking at
         if board.get_val(row, col_idx) != EMPTY_VALUE {
             current_letters.push(board.get_val(row, col_idx));
         }
         else {
+            // Turns out that checking with a set is faster than using a trie, at least for smaller hands
             if current_letters.len() > 1 && !valid_words.contains(&current_letters) {
                 return false;
             }
@@ -225,9 +556,19 @@ fn is_board_valid_horizontal(board: &Board, min_col: usize, max_col: usize, min_
         return false;
     }
     // Check down each column where a letter was played
-    for col_idx in start_col..end_col+1 {
+    for col_idx in start_col..=end_col {
         current_letters.clear();
-        for row_idx in min_row..max_row+1 {
+        // Find the furthest up row that the word is connected to
+        let mut minimum_row = row;
+        while minimum_row > min_row {
+            if board.get_val(minimum_row, col_idx) == EMPTY_VALUE {
+                minimum_row += 1;
+                break;
+            }
+            minimum_row -= 1;
+        }
+        minimum_row = minimum_row.max(min_row);
+        for row_idx in minimum_row..=max_row {
             if board.get_val(row_idx, col_idx) != EMPTY_VALUE {
                 current_letters.push(board.get_val(row_idx, col_idx));
             }
@@ -262,10 +603,20 @@ fn is_board_valid_horizontal(board: &Board, min_col: usize, max_col: usize, min_
 /// * `valid_words` - HashSet of all valid words as `Vec<usize>`s
 /// # Returns
 /// `bool` - whether the given `board` is made only of valid words
-fn is_board_valid_vertical(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, start_row: usize, end_row: usize, col: usize, valid_words: &HashSet<Word>) -> bool {
+fn is_board_valid_vertical(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, start_row: usize, end_row: usize, col: usize, valid_words: &HashSet<&Word>) -> bool {
     let mut current_letters: Vec<usize> = Vec::with_capacity(MAX_WORD_LENGTH);
+    // Find the furthest up row that the new play is connected to
+    let mut minimum_row = start_row;
+    while minimum_row > min_row {
+        if board.get_val(minimum_row, col) == EMPTY_VALUE {
+            minimum_row += 1;
+            break;
+        }
+        minimum_row -= 1;
+    }
+    minimum_row = minimum_row.max(min_row);
     // Check down the column where the word was played
-    for row_idx in min_row..max_row+1 {
+    for row_idx in minimum_row..=max_row {
         // If it's not an empty value, add it to the current word
         if board.get_val(row_idx, col) != EMPTY_VALUE {
             current_letters.push(board.get_val(row_idx, col));
@@ -289,9 +640,19 @@ fn is_board_valid_vertical(board: &Board, min_col: usize, max_col: usize, min_ro
         }
     }
     // Check across each row where a letter was played
-    for row_idx in start_row..end_row+1 {
+    for row_idx in start_row..=end_row {
         current_letters.clear();
-        for col_idx in min_col..max_col+1 {
+        // Find the furthest left column that the word is connected to
+        let mut minimum_col = col;
+        while minimum_col > min_col {
+            if board.get_val(row_idx, minimum_col) == EMPTY_VALUE {
+                minimum_col += 1;
+                break;
+            }
+            minimum_col -= 1;
+        }
+        minimum_col = minimum_col.max(min_col);
+        for col_idx in minimum_col..=max_col {
             if board.get_val(row_idx, col_idx) != EMPTY_VALUE {
                 current_letters.push(board.get_val(row_idx, col_idx));
             }
@@ -334,9 +695,9 @@ impl fmt::Display for LetterUsage {
 impl fmt::Debug for LetterUsage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-             LetterUsage::Remaining => write!(f, "Remaining"),
-             LetterUsage::Overused => write!(f, "Overused"),
-             LetterUsage::Finished => write!(f, "Finished")
+            LetterUsage::Remaining => write!(f, "Remaining"),
+            LetterUsage::Overused => write!(f, "Overused"),
+            LetterUsage::Finished => write!(f, "Finished")
         }
      }
 }
@@ -357,108 +718,43 @@ impl fmt::Display for Direction {
        }
     }
 }
-
-/// Plays a word on the board
-/// # Arguments
-/// * `word` - The word to be played
-/// * `row_idx` - The starting row at which to play the word
-/// * `col_idx` - The starting column at which to play the word
-/// * `board` - The current board (is modified in-place)
-/// * `direction` - The `Direction` in which to play the word
-/// # Returns
-/// *`Result` with:*
-/// * `bool` - Whether the word could be validly played
-/// * `Vec<(usize, usize)>` - Vector of the indices played in `board`
-/// 
-/// *or empty `Err` if out-of-bounds*
-fn play_word(word: &Word, row_idx: usize, col_idx: usize, board: &mut Board, direction: Direction, letters: &Letters) -> Result<(bool, Vec<(usize, usize)>, [usize; 26], LetterUsage), ()> {
-    let mut played_indices: Vec<(usize, usize)> = Vec::with_capacity(MAX_WORD_LENGTH);
-    match direction {
-        Direction::Horizontal => {
-            if col_idx + word.len() >= BOARD_SIZE {
-                return Err(());
-            }
-            let mut remaining_letters = letters.clone();
-            // Check if the word will start or end at a letter
-            let mut valid_loc = (col_idx != 0 && board.get_val(row_idx, col_idx-1) != EMPTY_VALUE) || (BOARD_SIZE-col_idx <= word.len() && board.get_val(row_idx, col_idx+word.len()) != EMPTY_VALUE);
-            // Check if the word will border any letters on the top or bottom
-            valid_loc |= (col_idx..col_idx+word.len()).any(|c_idx| (row_idx < BOARD_SIZE-1 && board.get_val(row_idx+1, c_idx) != EMPTY_VALUE) || (row_idx > 0 && board.get_val(row_idx-1, c_idx) != EMPTY_VALUE));
-            if !valid_loc {
-                return Ok((false, played_indices, remaining_letters, LetterUsage::Remaining));
-            }
-            else{
-                let mut entirely_overlaps = true;
-                for i in 0..word.len() {
-                    if board.get_val(row_idx, col_idx+i) == EMPTY_VALUE {
-                        board.set_val(row_idx, col_idx+i, word[i]);
-                        played_indices.push((row_idx, col_idx+i));
-                        entirely_overlaps = false;
-                        let elem = unsafe { remaining_letters.get_unchecked_mut(word[i]) };
-                        if *elem == 0 {
-                            return Ok((false, played_indices, remaining_letters, LetterUsage::Overused));
-                        }
-                        *elem -= 1;
-                    }
-                    else if board.get_val(row_idx, col_idx+i) != word[i] {
-                        return Ok((false, played_indices, remaining_letters, LetterUsage::Remaining));
-                    }
-                }
-                if remaining_letters.iter().all(|count| *count == 0) && !entirely_overlaps {
-                    return Ok((true, played_indices, remaining_letters, LetterUsage::Finished));
-                }
-                else {
-                    return Ok((!entirely_overlaps, played_indices, remaining_letters, LetterUsage::Remaining));
-                }
-            }
-        },
-        Direction::Vertical => {
-            if row_idx + word.len() >= BOARD_SIZE {
-                return Err(());
-            }
-            let mut remaining_letters = letters.clone();
-            // Check if the word will start or end at a letter
-            let mut valid_loc = (row_idx != 0 && board.get_val(row_idx-1, col_idx) != EMPTY_VALUE) || (BOARD_SIZE-row_idx <= word.len() && board.get_val(row_idx+word.len(), col_idx) != EMPTY_VALUE);
-            // Check if the word will border any letters on the right or left
-            valid_loc |= (row_idx..row_idx+word.len()).any(|r_idx| (col_idx < BOARD_SIZE-1 && board.get_val(r_idx, col_idx+1) != EMPTY_VALUE) || (col_idx > 0 && board.get_val(r_idx, col_idx-1) != EMPTY_VALUE));
-            if !valid_loc {
-                return Ok((false, played_indices, remaining_letters, LetterUsage::Remaining));
-            }
-            else{
-                let mut entirely_overlaps = true;
-                for i in 0..word.len() {
-                    if board.get_val(row_idx+i, col_idx) == EMPTY_VALUE {
-                        board.set_val(row_idx+i, col_idx, word[i]);
-                        played_indices.push((row_idx+i, col_idx));
-                        entirely_overlaps = false;
-                        let elem = unsafe { remaining_letters.get_unchecked_mut(word[i]) };
-                        if *elem == 0 {
-                            return Ok((false, played_indices, remaining_letters, LetterUsage::Overused));
-                        }
-                        *elem -= 1;
-                    }
-                    else if board.get_val(row_idx+i, col_idx) != word[i] {
-                        return Ok((false, played_indices, remaining_letters, LetterUsage::Remaining));
-                    }
-                }
-                if remaining_letters.iter().all(|count| *count == 0) && !entirely_overlaps {
-                    return Ok((true, played_indices, remaining_letters, LetterUsage::Finished));
-                }
-                else {
-                    return Ok((!entirely_overlaps, played_indices, remaining_letters, LetterUsage::Remaining));
-                }
-            }
+impl fmt::Debug for Direction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Direction::Vertical => write!(f, "Horizontal"),
+            Direction::Horizontal => write!(f, "Vertical")
         }
-    }
+     }
 }
 
-/// Undoes a play on the `board`
+/// Removes words that can't be played with `current_letters` plus a set number of `board_letters`
 /// # Arguments
-/// * `board` - `Board` being undone (is modified in-place)
-/// * `played_indices` - Vector of the indices in `board` that need to be reset
-fn undo_play(board: &mut Board, played_indices: &Vec<(usize, usize)>) {
-    for index in played_indices.iter() {
-        board.set_val(index.0, index.1, EMPTY_VALUE);
+/// * `current_letters` - Letters currently available in the hand
+/// * `board_letters` - Letters played on the board
+/// * `word_being_checked` - Word to check if it contains the appropriate number of letters
+/// * `filter_letters_on_board` - Maximum number of letters from `board_letters` that can be used when checking if the word can be played
+/// # Returns
+/// * `bool` - Whether `word_being_checked` should pass the filter
+fn check_filter_after_play_later(mut current_letters: Letters, mut board_letters: Letters, word_being_checked: &Word, filter_letters_on_board: usize) -> bool {
+    let mut num_from_board = 0usize;
+    for letter in word_being_checked.iter() {
+        let num_in_hand = current_letters.get_mut(*letter).unwrap();
+        if *num_in_hand == 0 {
+            if num_from_board == filter_letters_on_board {
+                return false;
+            }
+            let num_on_board = board_letters.get_mut(*letter).unwrap();
+            if *num_on_board == 0 {
+                return false;
+            }
+            *num_on_board -= 1;
+            num_from_board += 1;
+        }
+        else {
+            *num_in_hand -= 1;
+        }
     }
+    return true;
 }
 
 /// Checks which words can be played after the first
@@ -468,23 +764,289 @@ fn undo_play(board: &mut Board, played_indices: &Vec<(usize, usize)>) {
 /// * `played_on_board` - Set of the letters played on the board
 /// # Returns
 /// * `bool` - Whether the `word_being_checked` is playable
-fn check_filter_after_play(letters: Letters, word_being_checked: &Word, played_on_board: &HashSet<&usize>) -> bool {
-    let mut available_letters: [isize; 26] = unsafe { mem::transmute(letters) };//letters.into_iter().map(|l| l as isize).collect();
+fn check_filter_after_play(mut letters: Letters, word_being_checked: &Word, played_on_board: &HashSet<usize>) -> bool {
     let mut already_seen_negative = false;
     for letter in word_being_checked.iter() {
-        let elem = unsafe { available_letters.get_unchecked_mut(*letter) };
+        let elem = letters.get_mut(*letter).unwrap();
         if *elem == 0 && !played_on_board.contains(letter) {
             return false;
         }
-        else if *elem == 0 && already_seen_negative {
+        else if *elem <= 0 && already_seen_negative {
             return false;
         }
         else if *elem == 0 {
             already_seen_negative = true;
         }
-        *elem -= 1;
+        else {
+            *elem -= 1;
+        }
     }
     return true;
+}
+
+/// Gets the minimum and maximum columns where a word could be played at `row` on `board`
+/// # Arguments
+/// * `board` - Board to search
+/// * `row` - Row to check
+/// * `min_col` - Minimum occupied column on `board`
+/// * `max_col` - Maximum occupied column on `board`
+/// # Returns
+/// * `(usize, usize)` - Length-2 tuple of the (minimum column, maximum column) where a word could be played
+fn get_col_limits(board: &Board, row: usize, min_col: usize, max_col: usize) -> (usize, usize) {
+    let mut leftmost = max_col;
+    let mut rightmost = min_col;
+    if row == 0 {
+        for col in min_col..max_col {
+            if board.get_val(row, col) != EMPTY_VALUE || board.get_val(row+1, col) != EMPTY_VALUE {
+                leftmost = col;
+                break;
+            }
+        }
+        for col in (min_col..=max_col).rev() {
+            if board.get_val(row, col) != EMPTY_VALUE || board.get_val(row+1, col) != EMPTY_VALUE {
+                rightmost = col;
+                break;
+            }
+        }
+    }
+    else if row == BOARD_SIZE-1 {
+        for col in min_col..max_col {
+            if board.get_val(row, col) != EMPTY_VALUE || board.get_val(row-1, col) != EMPTY_VALUE {
+                leftmost = col;
+                break;
+            }
+        }
+        for col in (min_col..=max_col).rev() {
+            if board.get_val(row, col) != EMPTY_VALUE || board.get_val(row-1, col) != EMPTY_VALUE {
+                rightmost = col;
+                break;
+            }
+        }
+    }
+    else {
+        for col in min_col..max_col {
+            if board.get_val(row-1, col) != EMPTY_VALUE || board.get_val(row, col) != EMPTY_VALUE || board.get_val(row+1, col) != EMPTY_VALUE {
+                leftmost = col;
+                break;
+            }
+        }
+        for col in (min_col..=max_col).rev() {
+            if board.get_val(row-1, col) != EMPTY_VALUE || board.get_val(row, col) != EMPTY_VALUE || board.get_val(row+1, col) != EMPTY_VALUE {
+                rightmost = col;
+                break;
+            }
+        }
+    }
+    (leftmost, rightmost)
+}
+
+/// Gets the minimum and maximum rows where a word could be played at `col` on `board`
+/// # Arguments
+/// * `board` - Board to search
+/// * `col` - Column to check
+/// * `min_row` - Minimum occupied row on `board`
+/// * `max_row` - Maximum occupied row on `board`
+/// # Returns
+/// * `(usize, usize)` - Length-2 tuple of the (minimum row, maximum row) where a word could be played
+fn get_row_limits(board: &Board, col: usize, min_row: usize, max_row: usize) -> (usize, usize) {
+    let mut uppermost = min_row;
+    let mut lowermost = max_row;
+    if col == 0 {
+        for row in min_row..max_row {
+            if board.get_val(row, col) != EMPTY_VALUE || board.get_val(row, col+1) != EMPTY_VALUE {
+                uppermost = row;
+                break;
+            }
+        }
+        for row in (min_row..=max_row).rev() {
+            if board.get_val(row, col) != EMPTY_VALUE || board.get_val(row, col+1) != EMPTY_VALUE {
+                lowermost = row;
+                break;
+            }
+        }
+    }
+    else if col == BOARD_SIZE-1 {
+        for row in min_row..max_row {
+            if board.get_val(row, col) != EMPTY_VALUE || board.get_val(row, col-1) != EMPTY_VALUE {
+                uppermost = row;
+                break;
+            }
+        }
+        for row in (min_row..=max_row).rev() {
+            if board.get_val(row, col) != EMPTY_VALUE || board.get_val(row, col-1) != EMPTY_VALUE {
+                lowermost = row;
+                break;
+            }
+        }
+    }
+    else {
+        for row in min_row..max_row {
+            if board.get_val(row, col-1) != EMPTY_VALUE || board.get_val(row, col) != EMPTY_VALUE || board.get_val(row, col+1) != EMPTY_VALUE {
+                uppermost = row;
+                break;
+            }
+        }
+        for row in (min_row..=max_row).rev() {
+            if board.get_val(row, col-1) != EMPTY_VALUE || board.get_val(row, col) != EMPTY_VALUE || board.get_val(row, col+1) != EMPTY_VALUE {
+                lowermost = row;
+                break;
+            }
+        }
+    }
+    (uppermost, lowermost)
+}
+
+/// Tries to play a word horizontally anywhere on the `board`
+/// # Arguments
+/// * `board` - The `Board` to modify in-place
+/// * `word` - Word to try to play
+/// * `min_col` - Minimum occupied column index in `board`
+/// * `max_col` - Maximum occupied column index in `board`
+/// * `min_row` - Minimum occupied row index in `board`
+/// * `max_row` - Maximum occupied row index in `board`
+/// * `valid_words_vec` - Vector of vectors, each representing a word (see `convert_word_to_array`)
+/// * `valid_words_set` - HashSet of vectors, each representing a word (a HashSet version of `valid_words_vec` for faster membership checking)
+/// * `letters` - Length-26 array of the number of each letter in the hand
+/// * `depth` - Depth of the current recursive call
+/// * `words_checked` - The number of words checked in total
+/// * `letters_on_board` - Length-26 array of the number of each letter currently present on the `board`
+/// * `filter_letters_on_board` - Maximum number of letters currently on the board that can be used in a newly played word
+/// * `max_words_to_check` - Maximum number of words to check before stopping
+/// * `stop_t` - `AtomicBool` that, when set, indicates that processing should stop
+/// # Returns
+/// *`Result` with `Option` upon success with:*
+/// * `bool` - Whether the word could be validly played
+/// * `usize` - Minimum occupied column index in `board`
+/// * `usize` - Maximum occupied column index in `board`
+/// * `usize` - Minimum occupied row index in `board`
+/// * `usize` - Maximum occupied row index in `board`
+/// 
+/// *or `None` if no valid playing location was found, or empty `Err` another thread signalled to stop*
+fn try_play_word_horizontal(board: &mut Board, word: &Word, min_col: usize, max_col: usize, min_row: usize, max_row: usize, valid_words_vec: &Vec<&Word>, valid_words_set: &HashSet<&Word>, letters: Letters, depth: usize, words_checked: &mut usize, letters_on_board: &mut Letters, filter_letters_on_board: usize, max_words_to_check: usize, stop_t: &Arc<AtomicBool>) -> Result<Option<(bool, usize, usize, usize, usize)>, ()> {
+    // Try across all rows (starting from one before to one after)
+    for row_idx in min_row.saturating_sub(1)..=BOARD_SIZE.min(max_row+1) {
+        let (leftmost_col, rightmmost_col) = get_col_limits(board, row_idx, min_col, max_col);
+        // For each row, try across all columns (starting from the farthest out the word could be played)
+        for col_idx in leftmost_col.saturating_sub(word.len())..=BOARD_SIZE.min(rightmmost_col+1) {
+            // Using the ? because `play_word` can give an `Err` if the index is out of bounds
+            let res = board.play_word(word, row_idx, col_idx, Direction::Horizontal, &letters, letters_on_board);
+            if res.0 {
+                // If the word was played successfully (i.e. it's not a complete overlap and it borders at least one existing tile), then check the validity of the new words it forms
+                let new_min_col = min_col.min(col_idx);
+                let new_max_col = max_col.max(col_idx+word.len());
+                let new_min_row = min_row.min(row_idx);
+                let new_max_row = max_row.max(row_idx);
+                if is_board_valid_horizontal(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, col_idx, col_idx+word.len()-1, valid_words_set) {
+                    // If it's valid, go to the next recursive level (unless we've all the letters, at which point we're done)
+                    match res.3 {
+                        LetterUsage::Finished => {
+                            return Ok(Some((true, new_min_col, new_max_col, new_min_row, new_max_row)));
+                        },
+                        LetterUsage::Remaining => {
+                            let mut new_valid_words_vec: Vec<&Word> = Vec::with_capacity(valid_words_vec.len()/2);
+                            for i in 0..valid_words_vec.len() {
+                                if check_filter_after_play_later(letters.clone(), letters_on_board.clone(), valid_words_vec[i], filter_letters_on_board) {
+                                    new_valid_words_vec.push(valid_words_vec[i]);
+                                }
+                            }
+                            let res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, &new_valid_words_vec, valid_words_set, res.2, depth+1, words_checked, letters_on_board, filter_letters_on_board, max_words_to_check, stop_t)?;
+                            if res2.0 {
+                                // If that recursive stack finishes successfully, we're done! (could have used another Result or Option rather than a bool in the returned tuple, but oh well)
+                                return Ok(Some(res2));
+                            }
+                            else {
+                                // Otherwise, undo the previous play (cloning the board before each play so we don't have to undo is *way* slower)
+                                board.undo_play(&res.1, letters_on_board);
+                            }
+                        },
+                        LetterUsage::Overused => unreachable!()
+                    }
+                }
+                else {
+                    // If the play formed some invalid words, undo the previous play
+                    board.undo_play(&res.1, letters_on_board);
+                }
+            }
+            else {
+                // If trying to play the board was invalid, undo the play
+                board.undo_play(&res.1, letters_on_board);
+            }
+        }
+    }
+    Ok(None)
+}
+
+/// Tries to play a word vertically anywhere on the `board`
+/// # Arguments
+/// * `board` - The `Board` to modify in-place
+/// * `word` - Word to try to play
+/// * `min_col` - Minimum occupied column index in `board`
+/// * `max_col` - Maximum occupied column index in `board`
+/// * `min_row` - Minimum occupied row index in `board`
+/// * `max_row` - Maximum occupied row index in `board`
+/// * `valid_words_vec` - Vector of vectors, each representing a word (see `convert_word_to_array`)
+/// * `valid_words_set` - HashSet of vectors, each representing a word (a HashSet version of `valid_words_vec` for faster membership checking)
+/// * `letters` - Length-26 array of the number of each letter in the hand
+/// * `depth` - Depth of the current recursive call
+/// * `words_checked` - The number of words checked in total
+/// * `letters_on_board` - Length-26 array of the number of each letter currently present on the `board`
+/// * `filter_letters_on_board` - Maximum number of letters currently on the board that can be used in a newly played word
+/// * `max_words_to_check` - Maximum number of words to check before stopping
+/// * `stop_t` - `AtomicBool` that, when set, indicates that processing should stop
+/// # Returns
+/// *`Result` with `Option` upon success with:*
+/// * `bool` - Whether the word could be validly played
+/// * `usize` - Minimum occupied column index in `board`
+/// * `usize` - Maximum occupied column index in `board`
+/// * `usize` - Minimum occupied row index in `board`
+/// * `usize` - Maximum occupied row index in `board`
+/// 
+/// *or `None` if no valid playing location was found, or empty `Err` if another thread signalled to stop*
+fn try_play_word_vertically(board: &mut Board, word: &Word, min_col: usize, max_col: usize, min_row: usize, max_row: usize, valid_words_vec: &Vec<&Word>, valid_words_set: &HashSet<&Word>, letters: Letters, depth: usize, words_checked: &mut usize, letters_on_board: &mut Letters, filter_letters_on_board: usize, max_words_to_check: usize, stop_t: &Arc<AtomicBool>) -> Result<Option<(bool, usize, usize, usize, usize)>, ()> {
+    // Try down all columns
+    for col_idx in min_col.saturating_sub(1)..=BOARD_SIZE.min(max_col+1) {
+        let (uppermost_row, lowermost_row) = get_row_limits(board, col_idx, min_row, max_row);
+        // This is analagous to the above
+        for row_idx in uppermost_row.saturating_sub(word.len())..=BOARD_SIZE.min(lowermost_row+1) {
+            let res = board.play_word(word, row_idx, col_idx, Direction::Vertical, &letters, letters_on_board);
+            if res.0 {
+                let new_min_col = min_col.min(col_idx);
+                let new_max_col = max_col.max(col_idx);
+                let new_min_row = min_row.min(row_idx);
+                let new_max_row = max_row.max(row_idx+word.len());
+                if is_board_valid_vertical(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, row_idx+word.len()-1, col_idx, valid_words_set) {
+                    match res.3 {
+                        LetterUsage::Finished => {
+                            return Ok(Some((true, new_min_col, new_max_col, new_min_row, new_max_row)));
+                        },
+                        LetterUsage::Remaining => {
+                            let mut new_valid_words_vec: Vec<&Word> = Vec::with_capacity(valid_words_vec.len()/2);
+                            for i in 0..valid_words_vec.len() {
+                                if check_filter_after_play_later(letters.clone(), letters_on_board.clone(), valid_words_vec[i], filter_letters_on_board) {
+                                    new_valid_words_vec.push(valid_words_vec[i]);
+                                }
+                            }
+                            let res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, &new_valid_words_vec, valid_words_set, res.2, depth+1, words_checked, letters_on_board, filter_letters_on_board, max_words_to_check, stop_t)?;
+                            if res2.0 {
+                                return Ok(Some(res2));
+                            }
+                            else {
+                                board.undo_play(&res.1, letters_on_board);
+                            }
+                        },
+                        LetterUsage::Overused => unreachable!()
+                    }
+                }
+                else {
+                    board.undo_play(&res.1, letters_on_board);
+                }
+            }
+            else {
+                board.undo_play(&res.1, letters_on_board);
+            }
+        }
+    }
+    Ok(None)
 }
 
 /// Recursively solves Bananagrams
@@ -498,7 +1060,11 @@ fn check_filter_after_play(letters: Letters, word_being_checked: &Word, played_o
 /// * `valid_words_set` - HashSet of vectors, each representing a word (a HashSet version of `valid_words_vec` for faster membership checking)
 /// * `letters` - Length-26 array of the number of each letter in the hand
 /// * `depth` - Depth of the current recursive call
-/// * `stop_me` - Shared `AtomicBool` used to indicate when early stopping should occur
+/// * `words_checked` - The number of words checked in total
+/// * `letters_on_board` - Length-26 array of the number of each letter currently present on the `board`
+/// * `filter_letters_on_board` - Maximum number of letters currently on the board that can be used in a newly played word
+/// * `max_words_to_check` - Maximum number of words to check before stopping
+/// * `stop_t` - `AtomicBool` that, when set, indicates that processing should stop
 /// # Returns
 /// *`Result` with:*
 /// * `bool` - Whether the word could be validly played
@@ -507,179 +1073,30 @@ fn check_filter_after_play(letters: Letters, word_being_checked: &Word, played_o
 /// * `usize` - Minimum occupied row index in `board`
 /// * `usize` - Maximum occupied row index in `board`
 /// 
-/// *or empty `Err` on if out-of-bounds*
-fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, valid_words_vec: &Vec<Word>, valid_words_set: &HashSet<Word>, letters: Letters, depth: usize, play_sequence: &mut PlaySequence, previous_play_sequence: &PlaySequence, stop_me: &Arc<AtomicBool>) -> Result<(bool, usize, usize, usize, usize), ()> {
-    if depth+1 < previous_play_sequence.len() {
-        let word = &previous_play_sequence[depth+1].0;
-        let row_idx = previous_play_sequence[depth+1].1.0;
-        let col_idx = previous_play_sequence[depth+1].1.1;
-        let res = play_word(word, row_idx, col_idx, board, previous_play_sequence[depth+1].1.2, &letters)?;
-        if res.0 {
-            match previous_play_sequence[depth+1].1.2 {
-                Direction::Horizontal => {
-                    // If the word was played successfully (i.e. it's not a complete overlap and it borders at least one existing tile), then check the validity of the new words it forms
-                    let new_min_col = cmp::min(min_col, col_idx);
-                    let new_max_col = cmp::max(max_col, col_idx+word.len());
-                    let new_min_row = cmp::min(min_row, row_idx);
-                    let new_max_row = cmp::max(max_row, row_idx);
-                    if is_board_valid_horizontal(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, col_idx, col_idx+word.len()-1, valid_words_set) {
-                        // If it's valid, go to the next recursive level (where completion will be checked)
-                        play_sequence.push((word.clone(), (res.1[0].0, res.1[0].1, Direction::Horizontal)));
-                        match res.3 {
-                            LetterUsage::Finished => {
-                                return Ok((true, new_min_col, new_max_col, new_min_row, new_max_row));
-                            },
-                            LetterUsage::Remaining => {
-                                let res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, valid_words_vec, valid_words_set, res.2, depth+1, play_sequence, previous_play_sequence, stop_me)?;
-                                if res2.0 && !stop_me.load(Ordering::Relaxed) {
-                                    // If that recursive stack finishes successfully, we're done! (could have used another Result or Option rather than a bool in the returned tuple, but oh well)
-                                    return Ok(res2);
-                                }
-                                else {
-                                    // Otherwise, undo the previous play (cloning the board before each play so we don't have to undo is *way* slower)
-                                    play_sequence.pop();
-                                    undo_play(board, &res.1);
-                                }
-                            },
-                            LetterUsage::Overused => unreachable!()
-                        }
-                    }
-                    else {
-                        // If the play formed some invalid words, undo the previous play
-                        undo_play(board, &res.1);
-                    }
-                },
-                Direction::Vertical => {
-                    let new_min_col = cmp::min(min_col, col_idx);
-                    let new_max_col = cmp::max(max_col, col_idx);
-                    let new_min_row = cmp::min(min_row, row_idx);
-                    let new_max_row = cmp::max(max_row, row_idx+word.len());
-                    if is_board_valid_vertical(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, row_idx+word.len()-1, col_idx, valid_words_set) {
-                        play_sequence.push((word.clone(), (res.1[0].0, res.1[0].1, Direction::Vertical)));
-                        match res.3 {
-                            LetterUsage::Finished => {
-                                return Ok((true, new_min_col, new_max_col, new_min_row, new_max_row));
-                            },
-                            LetterUsage::Remaining => {
-                                let res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, valid_words_vec, valid_words_set, res.2, depth+1, play_sequence, previous_play_sequence, stop_me)?;
-                                if res2.0 && !stop_me.load(Ordering::Relaxed) {
-                                    return Ok(res2);
-                                }
-                                else {
-                                    play_sequence.pop();
-                                    undo_play(board, &res.1);
-                                }
-                            },
-                            LetterUsage::Overused => unreachable!()
-                        }   
-                    }
-                    else {
-                        undo_play(board, &res.1);
-                    }
-                }
-            }
-        }
-        else {
-            // If trying to play the board was invalid, undo the play
-            undo_play(board, &res.1);
-        }
-        return Ok((false, min_col, max_col, min_row, max_row));
+/// *or empty `Err` on if out-of-bounds, past the maximum number of words to check, or another thread signalled to stop*
+fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, valid_words_vec: &Vec<&Word>, valid_words_set: &HashSet<&Word>, letters: Letters, depth: usize, words_checked: &mut usize, letters_on_board: &mut Letters, filter_letters_on_board: usize, max_words_to_check: usize, stop_t: &Arc<AtomicBool>) -> Result<(bool, usize, usize, usize, usize), ()> {
+    if *words_checked > max_words_to_check || stop_t.load(Ordering::Relaxed) {
+        return Err(());
     }
     // If we're at an odd depth, play horizontally first (trying to alternate horizontal-vertical-horizontal as a heuristic to solve faster)
-    else if depth % 2 == 1 {
+    if depth % 2 == 1 {
         for word in valid_words_vec.iter() {
-            // Stop if we're signalled to
-            if stop_me.load(Ordering::Relaxed) {
+            *words_checked += 1;
+            if stop_t.load(Ordering::Relaxed) {
                 return Err(());
             }
-            // Try across all rows (starting from one before to one after)
-            for row_idx in min_row-1..max_row+2 {
-                // For each row, try across all columns (starting from the farthest out the word could be played)
-                for col_idx in min_col-word.len()..max_col+2 {
-                    // Using the ? because `play_word` can give an `Err` if the index is out of bounds
-                    let res = play_word(word, row_idx, col_idx, board, Direction::Horizontal, &letters)?;
-                    if res.0 {
-                        // If the word was played successfully (i.e. it's not a complete overlap and it borders at least one existing tile), then check the validity of the new words it forms
-                        let new_min_col = cmp::min(min_col, col_idx);
-                        let new_max_col = cmp::max(max_col, col_idx+word.len());
-                        let new_min_row = cmp::min(min_row, row_idx);
-                        let new_max_row = cmp::max(max_row, row_idx);
-                        if is_board_valid_horizontal(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, col_idx, col_idx+word.len()-1, valid_words_set) {
-                            // If it's valid, go to the next recursive level (unless we've all the letters, at which point we're done)
-                            play_sequence.push((word.clone(), (res.1[0].0, res.1[0].1, Direction::Horizontal)));
-                            match res.3 {
-                                LetterUsage::Finished => {
-                                    return Ok((true, new_min_col, new_max_col, new_min_row, new_max_row));
-                                },
-                                LetterUsage::Remaining => {
-                                    let res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, valid_words_vec, valid_words_set, res.2, depth+1, play_sequence, previous_play_sequence, stop_me)?;
-                                    if res2.0 && !stop_me.load(Ordering::Relaxed) {
-                                        // If that recursive stack finishes successfully, we're done! (could have used another Result or Option rather than a bool in the returned tuple, but oh well)
-                                        return Ok(res2);
-                                    }
-                                    else {
-                                        // Otherwise, undo the previous play (cloning the board before each play so we don't have to undo is *way* slower)
-                                        play_sequence.pop();
-                                        undo_play(board, &res.1);
-                                    }
-                                },
-                                LetterUsage::Overused => unreachable!()
-                            }
-                        }
-                        else {
-                            // If the play formed some invalid words, undo the previous play
-                            undo_play(board, &res.1);
-                        }
-                    }
-                    else {
-                        // If trying to play the board was invalid, undo the play
-                        undo_play(board, &res.1);
-                    }
-                }
+            if let Some(r) = try_play_word_horizontal(board, word, min_col, max_col, min_row, max_row, valid_words_vec, valid_words_set, letters, depth, words_checked, letters_on_board, filter_letters_on_board, max_words_to_check, stop_t)? {
+                return Ok(r);
             }
         }
         // If trying every word horizontally didn't work, try vertically instead
         for word in valid_words_vec.iter() {
-            if stop_me.load(Ordering::Relaxed) {
+            *words_checked += 1;
+            if stop_t.load(Ordering::Relaxed) {
                 return Err(());
             }
-            // Try down all columns
-            for col_idx in min_col-1..max_col+2 {
-                // This is analgous to the above
-                for row_idx in min_row-word.len()..max_row+2 {
-                    let res = play_word(word, row_idx, col_idx, board, Direction::Vertical, &letters)?;
-                    if res.0 {
-                        let new_min_col = cmp::min(min_col, col_idx);
-                        let new_max_col = cmp::max(max_col, col_idx);
-                        let new_min_row = cmp::min(min_row, row_idx);
-                        let new_max_row = cmp::max(max_row, row_idx+word.len());
-                        if is_board_valid_vertical(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, row_idx+word.len()-1, col_idx, valid_words_set) {
-                            play_sequence.push((word.clone(), (res.1[0].0, res.1[0].1, Direction::Vertical)));
-                            match res.3 {
-                                LetterUsage::Finished => {
-                                    return Ok((true, new_min_col, new_max_col, new_min_row, new_max_row));
-                                },
-                                LetterUsage::Remaining => {
-                                    let res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, valid_words_vec, valid_words_set, res.2, depth+1, play_sequence, previous_play_sequence, stop_me)?;
-                                    if res2.0 && !stop_me.load(Ordering::Relaxed) {
-                                        return Ok(res2);
-                                    }
-                                    else {
-                                        play_sequence.pop();
-                                        undo_play(board, &res.1);
-                                    }
-                                },
-                                LetterUsage::Overused => unreachable!()
-                            }
-                        }
-                        else {
-                            undo_play(board, &res.1);
-                        }
-                    }
-                    else {
-                        undo_play(board, &res.1);
-                    }
-                }
+            if let Some(r) = try_play_word_vertically(board, word, min_col, max_col, min_row, max_row, valid_words_vec, valid_words_set, letters, depth, words_checked, letters_on_board, filter_letters_on_board, max_words_to_check, stop_t)? {
+                return Ok(r);
             }
         }
         return Ok((false, min_col, max_col, min_row, max_row));
@@ -687,87 +1104,25 @@ fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usiz
     // If we're at an even depth, play vertically first. Otherwise this is analgous to the above.
     else {
         for word in valid_words_vec.iter() {
-            if stop_me.load(Ordering::Relaxed) {
+            *words_checked += 1;
+            if stop_t.load(Ordering::Relaxed) {
                 return Err(());
             }
-            // Try down all columns
-            for col_idx in min_col-1..max_col+2 {
-                for row_idx in min_row-word.len()..max_row+2 {
-                    let res = play_word(word, row_idx, col_idx, board, Direction::Vertical, &letters)?;
-                    if res.0 {
-                        let new_min_col = cmp::min(min_col, col_idx);
-                        let new_max_col = cmp::max(max_col, col_idx);
-                        let new_min_row = cmp::min(min_row, row_idx);
-                        let new_max_row = cmp::max(max_row, row_idx+word.len());
-                        if is_board_valid_vertical(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, row_idx+word.len()-1, col_idx, &valid_words_set) {
-                            play_sequence.push((word.clone(), (res.1[0].0, res.1[0].1, Direction::Vertical)));
-                            match res.3 {
-                                LetterUsage::Finished => {
-                                    return Ok((true, new_min_col, new_max_col, new_min_row, new_max_row));
-                                },
-                                LetterUsage::Remaining => {
-                                    let res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, valid_words_vec, valid_words_set, res.2, depth+1, play_sequence, previous_play_sequence, stop_me)?;
-                                    if res2.0 && !stop_me.load(Ordering::Relaxed) {
-                                        return Ok(res2);
-                                    }
-                                    else {
-                                        play_sequence.pop();
-                                        undo_play(board, &res.1);
-                                    }
-                                },
-                                LetterUsage::Overused => unreachable!()
-                            }
-                        }
-                        else {
-                            undo_play(board, &res.1);
-                        }
-                    }
-                    else {
-                        undo_play(board, &res.1);
-                    }
-                }
+            if let Some(r) = try_play_word_vertically(board, word, min_col, max_col, min_row, max_row, valid_words_vec, valid_words_set, letters, depth, words_checked, letters_on_board, filter_letters_on_board, max_words_to_check, stop_t)? {
+                return Ok(r);
             }
         }
+        // No point in checking horizontally for the first depth, since it would have to form a vertical word that was already checked and failed
+        if depth == 0 {
+            return Ok((false, min_col, max_col, min_row, max_row));
+        }
         for word in valid_words_vec.iter() {
-            if stop_me.load(Ordering::Relaxed) {
+            *words_checked += 1;
+            if stop_t.load(Ordering::Relaxed) {
                 return Err(());
             }
-            // Try across all rows
-            for row_idx in min_row-1..max_row+2 {
-                for col_idx in min_col-word.len()..max_col+2 {
-                    let res = play_word(word, row_idx, col_idx, board, Direction::Horizontal, &letters)?;
-                    if res.0 {
-                        let new_min_col = cmp::min(min_col, col_idx);
-                        let new_max_col = cmp::max(max_col, col_idx+word.len());
-                        let new_min_row = cmp::min(min_row, row_idx);
-                        let new_max_row = cmp::max(max_row, row_idx);
-                        if is_board_valid_horizontal(board, new_min_col, new_max_col, new_min_row, new_max_row, row_idx, col_idx, col_idx+word.len()-1, valid_words_set) {
-                            play_sequence.push((word.clone(), (res.1[0].0, res.1[0].1, Direction::Horizontal)));
-                            match res.3 {
-                                LetterUsage::Finished => {
-                                    return Ok((true, new_min_col, new_max_col, new_min_row, new_max_row));
-                                },
-                                LetterUsage::Remaining => {
-                                    let res2 = play_further(board, new_min_col, new_max_col, new_min_row, new_max_row, valid_words_vec, valid_words_set, res.2, depth+1, play_sequence, previous_play_sequence, stop_me)?;
-                                    if res2.0 && !stop_me.load(Ordering::Relaxed) {
-                                        return Ok(res2);
-                                    }
-                                    else {
-                                        play_sequence.pop();
-                                        undo_play(board, &res.1);
-                                    }
-                                },
-                                LetterUsage::Overused => unreachable!()
-                            }
-                        }
-                        else {
-                            undo_play(board, &res.1);
-                        }
-                    }
-                    else {
-                        undo_play(board, &res.1);
-                    }
-                }
+            if let Some(r) = try_play_word_horizontal(board, word, min_col, max_col, min_row, max_row, valid_words_vec, valid_words_set, letters, depth, words_checked, letters_on_board, filter_letters_on_board, max_words_to_check, stop_t)? {
+                return Ok(r);
             }
         }
         return Ok((false, min_col, max_col, min_row, max_row));
@@ -776,7 +1131,7 @@ fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usiz
 
 /// Tries to play a single letter on the board
 /// # Arguments
-/// * `board` - the `Board` on which to try to play the `letter`
+/// * `board` - The `Board` on which to try to play the `letter`
 /// * `min_col` - Minimum occupied column index in `board`
 /// * `max_col` - Maximum occupied column index in `board`
 /// * `min_row` - Minimum occupied row index in `board`
@@ -785,17 +1140,17 @@ fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usiz
 /// * `valid_words_set` - HashSet of all valid words
 /// # Returns
 /// `Option` - either `None` if no solution was found, or a `Some` tuple of `(row, col, new_min_col, new_max_col, new_min_row, new_max_row)` on success
-fn play_one_letter(board: &mut Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, letter: usize, valid_words_set: &HashSet<Word>) -> Option<(usize, usize, usize, usize, usize, usize)> {
+fn play_one_letter(board: &mut Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, letter: usize, valid_words_set: &HashSet<&Word>) -> Option<(usize, usize, usize, usize, usize, usize)> {
     // Loop through all possible locations and check if the letter works there
-    for row in min_row-1..max_row+2 {
-        for col in min_col-1..max_col+2 {
+    for row in min_row.saturating_sub(1)..=BOARD_SIZE.min(max_row+1) {
+        for col in min_col.saturating_sub(1)..=BOARD_SIZE.min(max_col+1) {
             if row < BOARD_SIZE && col < BOARD_SIZE && board.get_val(row, col) == EMPTY_VALUE {   // row/col don't need to be checked if they're greater than 0 since they'd underflow
                 if (col > 0 && board.get_val(row, col-1) != EMPTY_VALUE) || (col < BOARD_SIZE-1 && board.get_val(row, col+1) != EMPTY_VALUE) || (row > 0 && board.get_val(row-1, col) != EMPTY_VALUE) || (row < BOARD_SIZE-1 && board.get_val(row+1, col) != EMPTY_VALUE) {
                     board.set_val(row, col, letter);
-                    let new_min_col = cmp::min(min_col, col);
-                    let new_max_col = cmp::max(max_col, col);
-                    let new_min_row = cmp::min(min_row, row);
-                    let new_max_row = cmp::max(max_row, row);
+                    let new_min_col = min_col.min(col);
+                    let new_max_col = max_col.max(col);
+                    let new_min_row = min_row.min(row);
+                    let new_max_row = max_row.max(row);
                     // Could also use `is_board_valid_vertical`
                     if is_board_valid_horizontal(board, new_min_col, new_max_col, new_min_row, new_max_row, row, col, col, valid_words_set) {
                         // If it's valid, return the (potentially) new bounds, along with the location the letter was played
@@ -813,59 +1168,300 @@ fn play_one_letter(board: &mut Board, min_col: usize, max_col: usize, min_row: u
     return None;
 }
 
-/// Attempts to play off an existing board
+/// Recursively plays on an existing board by removing letters
 /// # Arguments
-/// * `previous_play_sequence` - Sequence of previous played moves
-/// * `valid_words_vec` - Vector of valid words for the given hand of letters
-/// * `valid_words_set` - HashSet of valid words (HashSet of `valid_words_vec` for faster membership checking)
-/// * `letters` - Array of the number of each letter in the hand
+/// * `board` - Existing board (will be modified in-place)
+/// * `letters_on_board` - Current letters on the `board`
+/// * `min_col` - Minimum occupied column index in `board`
+/// * `max_col` - Maximum occupied column index in `board`
+/// * `min_row` - Minimum occupied row index in `board`
+/// * `max_row` - Maximum occupied row index in `board`
+/// * `hand_letters` - Letters currently in the hand
+/// * `valid_words_vec` - Valid words that can be played on `board`
+/// * `valid_words_set` - Set of all valid words
+/// * `filter_letters_on_board` - Maximum number of letters from the board that can be used in a word
+/// * `max_words_to_check` - Maximum number of words to check
+/// * `stop_t` - AtomicBool for early stopping
 /// # Returns
-/// `Option` with:
-/// * `Board` - updated board
-/// * `PlaySequence` - updated play sequence
-/// * `usize` - Minimum occupied column index in `board`
-/// * `usize` - Maximum occupied column index in `board`
-/// * `usize` - Minimum occupied row index in `board`
-/// * `usize` - Maximum occupied row index in `board`
-/// 
-/// *or `None` if no valid play can be made on the existing board*
-fn play_existing(previous_play_sequence: &PlaySequence, valid_words_vec: &Vec<Word>, valid_words_set: &HashSet<Word>, letters: &Letters) -> Option<(Board, PlaySequence, usize, usize, usize, usize)> {
-    let mut board = Board::new();
-    let row = previous_play_sequence[0].1.0;
-    let col_start = previous_play_sequence[0].1.1;
-    let word = &previous_play_sequence[0].0;
-    let mut use_letters = letters.clone();
-    let mut word_letters = HashSet::with_capacity(word.len());
-    for i in 0..word.len() {
-        board.set_val(row, col_start+i, word[i]);
-        use_letters[word[i]] -= 1;
-        word_letters.insert(&word[i]);
-    }
-    let min_col = col_start;
-    let min_row = row;
-    let max_col = col_start + (word.len()-1);
-    let max_row = row;
-    let mut play_sequence: PlaySequence = Vec::with_capacity(50);
-    play_sequence.push((word.clone(), (row, col_start, Direction::Horizontal)));
-    if use_letters.iter().all(|count| *count == 0) {
-        return Some((board, play_sequence, min_col, max_col, min_row, max_row));
-    }
-    else {
-        let new_valid_words_vec: Vec<Word> = valid_words_vec.iter().filter(|word| check_filter_after_play(use_letters.clone(), word, &word_letters)).map(|word| word.clone()).collect();
-        let stop = Arc::new(AtomicBool::new(false));    // Just to match the signature
-        let res = play_further(&mut board, min_col, max_col, min_row, max_row, &new_valid_words_vec, valid_words_set, use_letters, 0, &mut play_sequence, previous_play_sequence, &stop);
-        match res {
-            Ok(result) => {
-                if result.0 {
-                    return Some((board, play_sequence, result.1, result.2, result.3, result.4));
+/// `Option` - either `None` if no solution was found, or a `Some` tuple of `(new_min_col, new_max_col, new_min_row, new_max_row)` on success
+fn play_removing(board: &mut Board, letters_on_board: &mut Letters, min_col: usize, max_col: usize, min_row: usize, max_row: usize, hand_letters: Letters, valid_words_vec: &Vec<&Word>, valid_words_set: &HashSet<&Word>, filter_letters_on_board: usize, max_words_to_check: usize, stop_t: &Arc<AtomicBool>) -> Option<(usize, usize, usize, usize)> {
+    let mut words_checked = 0usize;
+    // First try to play the words on the board, first horizontally and then vertically
+    for word in valid_words_vec {
+        match try_play_word_horizontal(board, word, min_col, max_col, min_row, max_row, valid_words_vec, valid_words_set, hand_letters, 0, &mut words_checked, &mut letters_on_board.clone(), filter_letters_on_board, max_words_to_check, stop_t) {
+            Ok(r) => {
+                // Ok + Some indicates that a solution was found
+                if let Some(rr) = r {
+                    // If another thread said we're done then just return None (although I *think* this isn't necessary since the return should then be an `Err`)
+                    if stop_t.load(Ordering::Relaxed) {
+                        return None;
+                    }
+                    // If we found a solution, set `stop_t` to true and return it
+                    else if rr.0 {
+                        stop_t.store(true, Ordering::Relaxed);
+                        return Some((rr.1, rr.2, rr.3, rr.4));
+                    }
+                    // Otherwise, try to play the word vertically
+                    else {
+                        match try_play_word_vertically(board, word, min_col, max_col, min_row, max_row, valid_words_vec, valid_words_set, hand_letters, 0, &mut words_checked, &mut letters_on_board.clone(), filter_letters_on_board, max_words_to_check, stop_t) {
+                            Ok(rrr) => {
+                                if let Some(rrrr) = rrr {
+                                    if stop_t.load(Ordering::Relaxed) {
+                                        return None;
+                                    }
+                                    else if rrrr.0 {
+                                        stop_t.store(true, Ordering::Relaxed);
+                                        return Some((rrrr.1, rrrr.2, rrrr.3, rrrr.4));
+                                    }
+                                }
+                            },
+                            Err(_) => {
+                                return None;
+                            }
+                        }
+                    }
                 }
                 else {
-                    return None;
+                    match try_play_word_vertically(board, word, min_col, max_col, min_row, max_row, valid_words_vec, valid_words_set, hand_letters, 0, &mut words_checked, &mut letters_on_board.clone(), filter_letters_on_board, max_words_to_check, stop_t) {
+                        Ok(rrr) => {
+                            if let Some(rrrr) = rrr {
+                                if stop_t.load(Ordering::Relaxed) {
+                                    return None;
+                                }
+                                else if rrrr.0 {
+                                    stop_t.store(true, Ordering::Relaxed);
+                                    return Some((rrrr.1, rrrr.2, rrrr.3, rrrr.4));
+                                }
+                            }
+                        },
+                        Err(_) => {
+                            return None;
+                        }
+                    }
                 }
             },
-            _ => None
+            // An `Err` indicates that a thread signalled to stop
+            Err(_) => {
+                return None;
+            }
         }
     }
+    // If playing the word failed, find the new removable_indices and continue recursively
+    let mut removable_indices = get_removable_indices(board, min_col, max_col, min_row, max_row);
+    removable_indices.sort_unstable_by(|a, b| a.0.len().cmp(&b.0.len()));
+    for rmv in removable_indices {
+        let mut new_letters_on_board = letters_on_board.clone();
+        let prev_vals = board.undo_play(&rmv.0, &mut new_letters_on_board);
+        let mut new_hand_letters = hand_letters.clone();
+        prev_vals.iter().for_each(|p| {
+            new_hand_letters[*p] += 1;
+        });
+        // If we found a solution, return it
+        if let Some(res) = play_removing(board, &mut new_letters_on_board, rmv.1, rmv.2, rmv.3, rmv.4, new_hand_letters, valid_words_vec, valid_words_set, filter_letters_on_board, max_words_to_check, stop_t) {
+            return Some(res);
+        }
+        // If we didn't find a solution because another thread said to stop, then return None
+        else if stop_t.load(Ordering::Relaxed) {
+            return None;
+        }
+        // Otherwise undo the undo and continue to the next set of removable indices
+        else {
+            for (idx, val) in rmv.0.iter().zip(prev_vals) {
+                board.set_val(idx.0, idx.1, val);
+            }
+        }
+    }
+    None
+}
+
+/// Plays a new hand of `letters` on an existing `board`
+/// # Arguments
+/// * `old_board` - Previous board solution
+/// * `min_col` - Minimum occupied column index
+/// * `max_col` - Maximum occupied column index
+/// * `min_row` - Minimum occupied row index
+/// * `max_row` - Maximum occupied row index
+/// * `letters` - Letters in the new hand
+/// * `filter_letters_on_board` - Maximum number of letters from the board that can be used in a word
+/// * `max_words_to_check` - Maximum number of words to check
+fn play_existing(old_board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, letters: &Letters, valid_words_set: &HashSet<&Word>, dict_to_use: &Vec<Word>, filter_letters_on_board: usize, max_words_to_check: usize) -> Option<BoardAndIdxs> {
+    // First, try to play words that use only the new letters, plus one already present on the board
+    let mut hand_letters = letters.clone();
+    let mut old_letters_on_board = [0usize; 26];
+    let mut played_on_board: HashSet<usize> = HashSet::new();
+    for row in min_row..=max_row {
+        for col in min_col..=max_col {
+            if old_board.get_val(row, col) != EMPTY_VALUE {
+                hand_letters[old_board.get_val(row, col)] -= 1;
+                old_letters_on_board[old_board.get_val(row, col)] += 1;
+                played_on_board.insert(old_board.get_val(row, col));
+            }
+        }
+    }
+    let valid_words_vec: Vec<&Word> = dict_to_use.iter().filter(|w| check_filter_after_play_later(hand_letters.clone(), old_letters_on_board.clone(), w, filter_letters_on_board)).collect();
+    // Prepare for threading/early termination using `AtomicBool`
+    let stop = Arc::new(AtomicBool::new(false));
+    let arc_valid_words_set = Arc::new(valid_words_set);
+    let char_vec: Vec<(Board, usize, usize, usize, usize)> = Vec::new();
+    let ret_val = Arc::new(Mutex::new(char_vec));
+    if !valid_words_vec.is_empty() {
+        // Split the words to check up into appropriate chunks based on the available parallelism
+        let default_parallelism_approx =  thread::available_parallelism().unwrap_or(NonZeroUsize::new(1).unwrap()).get();
+        let chunk_size = (valid_words_vec.len() as f32)/(default_parallelism_approx as f32);
+        let mut chunks: Vec<Vec<&Word>> = vec![Vec::with_capacity(chunk_size.ceil() as usize); default_parallelism_approx];
+        for (i, word) in valid_words_vec.iter().enumerate() {
+            chunks[i % default_parallelism_approx].push(word);
+        }
+        let arc_valid_words_vec = Arc::new(valid_words_vec);
+        // For each thread (i.e. piece of available parallelism), spawn a new thread to check those words
+        // These threads check different sets of initial words in the board, and whichever finishes first signals the others to stop
+        thread::scope(|s| {
+            let mut handles: Vec<thread::ScopedJoinHandle<()>> = Vec::with_capacity(chunks.len());
+            for chunk in chunks {
+                let stop_t = stop.clone();
+                let new_letters = hand_letters.clone();
+                let copied_new_valid_words_vec = Arc::clone(&arc_valid_words_vec);
+                let copied_valid_words_set = Arc::clone(&arc_valid_words_set);
+                let conn = Arc::clone(&ret_val);
+                let board_cloned = old_board.clone();
+                let letters_on_board = old_letters_on_board.clone();
+                let handle = s.spawn(move || {
+                    // Loop through each word and play it on a new board
+                    let mut words_checked = 0;
+                    let mut board = board_cloned.clone();
+                    for word in chunk.iter() {
+                        match try_play_word_horizontal(&mut board, word, min_col, max_col, min_row, max_row, &copied_new_valid_words_vec, &copied_valid_words_set, new_letters, 0, &mut words_checked, &mut letters_on_board.clone(), filter_letters_on_board, max_words_to_check, &stop_t) {
+                            Ok(r) => {
+                                if let Some(rr) = r {
+                                    if stop_t.load(Ordering::Relaxed) {
+                                        break;
+                                    }
+                                    else if rr.0 {
+                                        stop_t.store(true, Ordering::Relaxed);
+                                        let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
+                                        ret.push((board, rr.1, rr.2, rr.3, rr.4));
+                                        break;
+                                    }
+                                    else {
+                                        match try_play_word_vertically(&mut board, word, min_col, max_col, min_row, max_row, &copied_new_valid_words_vec, &copied_valid_words_set, new_letters, 0, &mut words_checked, &mut letters_on_board.clone(), filter_letters_on_board, max_words_to_check, &stop_t) {
+                                            Ok(rrr) => {
+                                                if let Some(rrrr) = rrr {
+                                                    if rrrr.0 && !stop_t.load(Ordering::Relaxed) {
+                                                        stop_t.store(true, Ordering::Relaxed);
+                                                        let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
+                                                        ret.push((board, rrrr.1, rrrr.2, rrrr.3, rrrr.4));
+                                                        break;
+                                                    }
+                                                }
+                                            },
+                                            Err(_) => {
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                else {
+                                    match try_play_word_vertically(&mut board, word, min_col, max_col, min_row, max_row, &copied_new_valid_words_vec, &copied_valid_words_set, new_letters, 0, &mut words_checked, &mut letters_on_board.clone(), filter_letters_on_board, max_words_to_check, &stop_t) {
+                                        Ok(rrr) => {
+                                            if let Some(rrrr) = rrr {
+                                                if rrrr.0 && !stop_t.load(Ordering::Relaxed) {
+                                                    stop_t.store(true, Ordering::Relaxed);
+                                                    let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
+                                                    ret.push((board, rrrr.1, rrrr.2, rrrr.3, rrrr.4));
+                                                    break;
+                                                }
+                                            }
+                                        },
+                                        Err(_) => {
+                                            break;
+                                        }
+                                    }
+                                }
+                            },
+                            Err(_) => {
+                                break;
+                            }
+                        }
+                    }
+                });
+                handles.push(handle);
+            }
+            // Wait for all the threads
+            for handle in handles {
+                let _res = handle.join();
+            }
+        });    
+        // If we're done, return the result
+        let ret = ret_val.lock().expect("Failed to get lock on shared ret_val when checking return");
+        if !ret.is_empty() {
+            return Some(ret[0].clone());
+        }
+    }
+
+    // If that didn't work (or there were no valid words), try recursively looping through indices that can be removed
+    let arc_dict_to_use = Arc::new(dict_to_use);
+    let mut removable_indices = get_removable_indices(old_board, min_col, max_col, min_row, max_row);
+    removable_indices.sort_unstable_by(|a, b| a.0.len().cmp(&b.0.len()));  // Try smaller sets of removable indices first
+    let default_parallelism_approx =  thread::available_parallelism().unwrap_or(NonZeroUsize::new(1).unwrap()).get();
+    let chunk_size = (removable_indices.len() as f32)/(default_parallelism_approx as f32);
+    let mut chunks: Vec<Vec<&Removable>> = vec![Vec::with_capacity(chunk_size.ceil() as usize); default_parallelism_approx];
+    for (i, r) in removable_indices.iter().enumerate() {
+        chunks[i % default_parallelism_approx].push(r);
+    }
+    thread::scope(|s| {
+        let mut handles: Vec<thread::ScopedJoinHandle<()>> = Vec::with_capacity(chunks.len());
+        for chunk in chunks {
+            let stop_t = stop.clone();
+            let mut cloned_board = old_board.clone();
+            let letters_on_board = old_letters_on_board.clone();
+            let new_letters = hand_letters.clone();
+            let copied_valid_words_vec = Arc::clone(&arc_dict_to_use);
+            let copied_valid_words_set = Arc::clone(&arc_valid_words_set);
+            let conn = Arc::clone(&ret_val);
+            let handle = s.spawn(move || {
+                for r in chunk {
+                    // "Undo" the letters that we want to remove
+                    let mut new_letters_on_board = letters_on_board.clone();
+                    let prev_letters = cloned_board.undo_play(&r.0, &mut new_letters_on_board);
+                    let mut new_hand_letters = new_letters.clone();
+                    prev_letters.iter().for_each(|p| {
+                        new_hand_letters[*p] += 1;
+                    });
+                    let valid_words_vec = copied_valid_words_vec.iter().filter(|w| check_filter_after_play_later(new_hand_letters.clone(), new_letters_on_board.clone(), w, filter_letters_on_board)).collect();
+                    // If we found a solution, set it as a solution and break (setting stop_t is performed in `play_removing`)
+                    if let Some(res) = play_removing(&mut cloned_board, &mut new_letters_on_board, r.1, r.2, r.3, r.4, new_hand_letters, &valid_words_vec, &copied_valid_words_set, filter_letters_on_board, max_words_to_check, &stop_t) {
+                        let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
+                        ret.push((cloned_board, res.0, res.1, res.2, res.3));
+                        break;
+                    }
+                    else {
+                        // Otherwise if stop_t was set, break (another thread has solved it)
+                        if stop_t.load(Ordering::Relaxed) {
+                            break;
+                        }
+                        // Othwerwise undo the undo and try with the next set of letters to remove
+                        else {
+                            for (idx, val) in r.0.iter().zip(prev_letters) {
+                                cloned_board.set_val(idx.0, idx.1, val);
+                            }
+                        }
+                    }
+                }
+            });
+            handles.push(handle);
+        }
+        // Wait for all the threads
+        for handle in handles {
+            let _res = handle.join();
+        }
+    });
+    // If we're done, return the result
+    let ret = ret_val.lock().expect("Failed to get lock on shared ret_val when checking return");
+    if !ret.is_empty() {
+        return Some(ret[0].clone());
+    }
+    // Otherwise, return None
+    None
 }
 
 /// For comparing a current hand of letters to a previous hand
@@ -878,6 +1474,16 @@ enum LetterComparison {
     GreaterByMoreThanOne,
     /// The hand is the same as before
     Same
+}
+impl fmt::Debug for LetterComparison {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            LetterComparison::SomeLess => write!(f, "Some less"),
+            LetterComparison::GreaterByOne => write!(f, "Greater by one"),
+            LetterComparison::GreaterByMoreThanOne => write!(f, "Greater by more than one"),
+            LetterComparison::Same => write!(f, "Same")
+        }
+     }
 }
 
 /// Struct returned when getting playable words
@@ -894,11 +1500,12 @@ struct PlayableWords {
 struct Solution {
     /// The solved board
     board: Vec<Vec<String>>,
-    /// How long it took to solve the board
+    /// How long it took to solve the board in milliseconds
     elapsed: u128
 }
 
 /// The previous game state
+#[derive(Clone)]
 struct GameState {
     /// The previous board
     board: Board,
@@ -911,9 +1518,7 @@ struct GameState {
     /// The maximum played row in `board`
     max_row: usize,
     /// The hand used to make `board`
-    letters: Letters,
-    /// The indices played at each level of the recursive chain
-    play_sequence: PlaySequence
+    letters: Letters
 }
 
 /// Controls the state of the app
@@ -922,8 +1527,108 @@ struct AppState {
     all_words_short: Vec<Word>,
     /// Complete Scrabble dictionary
     all_words_long: Vec<Word>,
+    /// Stack of previous solutions
+    undo_stack: Mutex<Vec<Option<GameState>>>,
+    /// Stack of undone solutions
+    redo_stack: Mutex<Vec<Option<GameState>>>,
     /// The last game state (if `None`, then no previous game has been played)
-    last_game: Mutex<Option<GameState>>
+    last_game: Mutex<Option<GameState>>,
+    /// Number of letters present on the board that can be used in a word (higher will result in fewer words being filtered out)
+    filter_letters_on_board: Mutex<usize>,
+    /// Maximum number of words to check before stopping
+    maximum_words_to_check: Mutex<usize>,
+    /// Whether to use the long dictionary or the short one
+    use_long_dictionary: Mutex<bool>
+}
+
+/// Represents the current settings
+#[derive(Serialize)]
+struct CurrentSettings {
+    /// Number of letters present on the board that can be used in a word (higher will result in fewer words being filtered out)
+    filter_letters_on_board: usize,
+    /// Maximum number of words to check before stopping
+    maximum_words_to_check: usize,
+    /// Whether to use the long dictionary or the short one
+    use_long_dictionary: bool
+}
+
+/// Represents a game undo or redo
+#[derive(Serialize)]
+struct UndoRedo {
+    /// The previous solution
+    solution: Vec<Vec<String>>,
+    /// The letters in the previous hand
+    letters: HashMap<char, u64>,
+    /// Whether an undo can be performed
+    undo_possible: bool,
+    /// Whether a redo can be performed
+    redo_possible: bool
+}
+
+/// Undoes a previous play
+#[tauri::command]
+fn undo(state: State<'_, AppState>) -> Result<UndoRedo, String> {
+    let mut undo_stack = state.undo_stack.lock().or(Err("Failed to get lock on undo stack!"))?;
+    let mut redo_stack = state.redo_stack.lock().or(Err("Failed to get lock on redo stack!"))?;
+    let mut game_state = state.last_game.lock().or(Err("Failed to get on last game!"))?;
+    if let Some(prev_state) = undo_stack.pop() {
+        redo_stack.push(game_state.clone());
+        *game_state = prev_state.clone();
+        match prev_state {
+            Some(p) => {
+                let mut letters = HashMap::new();
+                for (c, n) in UPPERCASE.chars().into_iter().zip(p.letters) {
+                    letters.insert(c, n as u64);
+                }
+                return Ok(UndoRedo {
+                    solution: board_to_vec(&p.board, p.min_col, p.max_col, p.min_row, p.max_row, &HashSet::new()),
+                    letters,
+                    undo_possible: undo_stack.len() > 0,
+                    redo_possible: true
+                });
+            },
+            None => {
+                let letters: HashMap<char, u64> = UPPERCASE.chars().into_iter().map(|c| (c, 0)).collect();
+                return Ok(UndoRedo { solution: Vec::new(), letters, undo_possible: undo_stack.len() > 0, redo_possible: true });
+            }
+        }
+    }
+    else {
+        return Err("No undos available!".to_owned());
+    }
+}
+
+/// Redoes an undone play
+#[tauri::command]
+fn redo(state: State<'_, AppState>) -> Result<UndoRedo, String> {
+    let mut undo_stack = state.undo_stack.lock().or(Err("Failed to get lock on undo stack!"))?;
+    let mut redo_stack = state.redo_stack.lock().or(Err("Failed to get lock on redo stack!"))?;
+    let mut game_state = state.last_game.lock().or(Err("Failed to get on last game!"))?;
+    if let Some(prev_state) = redo_stack.pop() {
+        undo_stack.push(game_state.clone());
+        *game_state = prev_state.clone();
+        match prev_state {
+            Some(p) => {
+                let mut letters = HashMap::new();
+                for (c, n) in UPPERCASE.chars().into_iter().zip(p.letters) {
+                    letters.insert(c, n as u64);
+                }
+                return Ok(UndoRedo {
+                    solution: board_to_vec(&p.board, p.min_col, p.max_col, p.min_row, p.max_row, &HashSet::new()),
+                    letters,
+                    undo_possible: undo_stack.len() > 0,
+                    redo_possible: redo_stack.len() > 0
+                });
+            },
+            None => {
+                let letters: HashMap<char, u64> = UPPERCASE.chars().into_iter().map(|c| (c, 0)).collect();
+                return Ok(UndoRedo { solution: Vec::new(), letters, undo_possible: undo_stack.len() > 0, redo_possible: redo_stack.len() > 0 });
+            }
+        }
+    }
+    else {
+        return Err("No redos available!".to_owned());
+    }
 }
 
 /// Generates random letters based on user input
@@ -972,7 +1677,7 @@ async fn get_random_letters(what: String, how_many: i64, _state: State<'_, AppSt
                 to_choose_from.push(c);
             }
         }
-        // Then selected `how_many` characters from that vector
+        // Then selecte `how_many` characters from that vector
         let selected_chars: Vec<char> = to_choose_from.choose_multiple(&mut rng, how_many as usize).cloned().collect();
         for i in 0..selected_chars.len() {
             let old_val = return_chars.get(&selected_chars[i]);
@@ -1018,7 +1723,7 @@ async fn get_random_letters(what: String, how_many: i64, _state: State<'_, AppSt
 
 /// Async command executed by the frontend to get the playable words for a given hand of letters
 /// # Arguments
-/// * `available_letters` - `HashMap` (from JavaScript object) mapping string letters to numeric quanity of each letter
+/// * `available_letters` - `HashMap` (from JavaScript object) mapping string letters to numeric quantity of each letter
 /// * `state` - Current state of the app
 /// # Returns
 /// `Result` of `PlayableWords` with two keys - "short" (common words playable using `available_letters`) and "long" (Scrabble words playable using `available_letters`)
@@ -1042,9 +1747,41 @@ async fn get_playable_words(available_letters: HashMap<String, i64>, state: Stat
             }
         }
     }
-    let playable_short: Vec<String> = state.all_words_short.iter().filter(|word| is_makeable(word, letters)).map(|word| convert_array_to_word(word)).collect();
-    let playable_long: Vec<String> = state.all_words_long.iter().filter(|word| is_makeable(word, letters)).map(|word| convert_array_to_word(word)).collect();
-    return Ok(PlayableWords { short: playable_short, long: playable_long })
+    let playable_short: Vec<String> = state.all_words_short.iter().filter(|word| is_makeable(word, &letters)).map(convert_array_to_word).collect();
+    let playable_long: Vec<String> = state.all_words_long.iter().filter(|word| is_makeable(word, &letters)).map( convert_array_to_word).collect();
+    return Ok(PlayableWords { short: playable_short, long: playable_long });
+}
+
+/// Updates the settings
+/// # Arguments
+/// * `filter_letters_on_board` - Maximum number of letters on the board that can be used when forming a word
+/// * `maximum_words_to_check` - Maximum number of iterations to perform
+/// * `use_long_dictionary` - Whether to use the long dictionary instead of the short one
+/// Empty `Result` upon success
+/// 
+/// *or String `Err` upon failure*
+#[tauri::command]
+fn set_settings(filter_letters_on_board: usize, maximum_words_to_check: usize, use_long_dictionary: bool, state: State<'_, AppState>) -> Result<(), String> {
+    let mut to_change = state.filter_letters_on_board.lock().or(Err("Failed to get lock on state!"))?;
+    *to_change = filter_letters_on_board;
+    let mut to_change = state.maximum_words_to_check.lock().or(Err("Failed to get lock on state!"))?;
+    *to_change = maximum_words_to_check;
+    let mut to_change = state.use_long_dictionary.lock().or(Err("Failed to get lock on state!"))?;
+    *to_change = use_long_dictionary;
+    Ok(())
+}
+
+/// Gets the current settings
+/// # Returns
+/// `Results` with struct containing the current settings
+/// 
+/// *or String `Err` upon failure*
+#[tauri::command]
+fn get_settings(state: State<'_, AppState>) -> Result<CurrentSettings, String> {
+    let filter_letters_on_board = *state.filter_letters_on_board.lock().or(Err("Failed to get lock on state!"))?;
+    let use_long_dictionary = *state.use_long_dictionary.lock().or(Err("Failed to get lock on state!"))?;
+    let maximum_words_to_check = *state.maximum_words_to_check.lock().or(Err("Failed to get lock on state!"))?;
+    Ok(CurrentSettings { filter_letters_on_board, use_long_dictionary, maximum_words_to_check })
 }
 
 /// Async command executed by the frontend to reset the Banangrams board
@@ -1053,17 +1790,21 @@ async fn get_playable_words(available_letters: HashMap<String, i64>, state: Stat
 /// # Returns
 /// Empty `Result` upon success
 /// 
-/// *or empty `Err` if out-of-bounds*
+/// *or String `Err` upon failure*
 #[tauri::command]
 async fn reset(state: State<'_, AppState>) -> Result<(), String> {
     let mut last_game_state = state.last_game.lock().or(Err("Failed to get lock on the last game state"))?;
+    let mut undo_stack = state.undo_stack.lock().or(Err("Failed to get lock on undo stack!"))?;
+    let mut redo_stack = state.redo_stack.lock().or(Err("Failed to get lock on redo stack!"))?;
+    undo_stack.push(last_game_state.clone());
+    redo_stack.clear();
     *last_game_state = None;
     Ok(())
 }
 
 /// Async command executed by the frontend to solve a Bananagrams board
 /// # Arguments
-/// * `available_letters` - `HashMap` (from JavaScript object) mapping string letters to numeric quanity of each letter
+/// * `available_letters` - `HashMap` (from JavaScript object) mapping string letters to numeric quantity of each letter
 /// * `state` - Current state of the app
 /// # Returns
 /// `Result` as a `Solution` with a vector of vector of chars of the solution and the elapsed time
@@ -1089,22 +1830,17 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
         }
     }
     // Check whether a board has been played already
-    let mut last_game_state: std::sync::MutexGuard<'_, Option<GameState>>;
-    match state.last_game.lock() {
-        Ok(locked) => {
-            last_game_state = locked;
-        },
-        _ => {
-            return Err("Failed to get lock on last game state".to_owned());
-        }
-    }
-    let mut previous_play_sequence: Option<PlaySequence> = None;
+    let mut last_game_state = state.last_game.lock().or(Err("Failed to get lock on last game state"))?;
+    let mut undo_stack = state.undo_stack.lock().or(Err("Failed to get lock on undo stack!"))?;
+    let mut redo_stack = state.redo_stack.lock().or(Err("Failed to get lock on redo stack!"))?;
+    let max_words_to_check = *state.maximum_words_to_check.lock().or(Err("Failed to get lock on maximum words!"))?;
+    let filter_letters_on_board = *state.filter_letters_on_board.lock().or(Err("Failed to get lock on maximum board letters!"))?;
+    let mut previous_board: Option<BoardAndIdxs> = None;
     match &*last_game_state {   // I don't like &*
         Some(prev_state) => {
-            previous_play_sequence = Some(prev_state.play_sequence.clone());
-            // If a board has been played, check whether the letters are the same as before, or if some are more or less
-            let mut comparison = LetterComparison::Same;
+            previous_board = Some((prev_state.board.clone(), prev_state.min_col, prev_state.max_col, prev_state.min_row, prev_state.max_row));
             let mut seen_greater: usize = EMPTY_VALUE;
+            let mut comparison = LetterComparison::Same;
             for i in 0..26 {
                 if letters[i] < prev_state.letters[i] {
                     // Any less means we re-do the board, so we can break here
@@ -1119,6 +1855,7 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                     seen_greater = i;
                 }
             }
+            let dict_to_use = if *state.use_long_dictionary.lock().or(Err("Failed to get lock on using long dictionary!"))? {&state.all_words_long} else {&state.all_words_short};
             match comparison {
                 LetterComparison::Same => {
                     // If the hand is the same then no need to do anything
@@ -1126,46 +1863,48 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                 },
                 LetterComparison::GreaterByOne => {
                     // If only a single letter has increased by one, then first check just that letter
-                    let valid_words_vec: Vec<Word> = state.all_words_short.iter().filter(|word| is_makeable(word, letters)).map(|word| word.clone()).collect();
-                    let valid_words_set: HashSet<Word> = HashSet::from_iter(valid_words_vec.clone());
+                    let valid_words_set: HashSet<&Word> = HashSet::from_iter(state.all_words_short.iter().filter(|word| is_makeable(word, &letters)));
                     let mut board = prev_state.board.clone();
                     let res = play_one_letter(&mut board, prev_state.min_col, prev_state.max_col, prev_state.min_row, prev_state.max_row, seen_greater, &valid_words_set);
                     match res {
                         Some(result) => {
-                            let mut play_sequence = prev_state.play_sequence.clone();
-                            play_sequence.push((vec![seen_greater], (result.0, result.1, Direction::Horizontal)));
-                            let previous_idxs = get_previous_idxs(&prev_state.play_sequence, &play_sequence);
-                            *last_game_state = Some(GameState { board: board.clone(), min_col: result.2, max_col: result.3, min_row: result.4, max_row: result.5, letters, play_sequence });
+                            let previous_idxs = get_board_overlap(&prev_state.board, &board, prev_state.min_col, prev_state.max_col, prev_state.min_row, prev_state.max_row, result.2, result.3, result.4, result.5);
+                            undo_stack.push(last_game_state.clone());
+                            redo_stack.clear();
+                            *last_game_state = Some(GameState { board: board.clone(), min_col: result.2, max_col: result.3, min_row: result.4, max_row: result.5, letters });
                             return Ok(Solution { board: board_to_vec(&board, result.2, result.3, result.4, result.5, &previous_idxs), elapsed: now.elapsed().as_millis() });
                         },
                         None => {
                             // If we failed when playing one letter, try playing off the existing board
-                            let attempt = play_existing(&prev_state.play_sequence, &valid_words_vec, &valid_words_set, &letters);
+                            let attempt = play_existing(&prev_state.board, prev_state.min_col, prev_state.max_col, prev_state.min_row, prev_state.max_row, &letters, &valid_words_set, dict_to_use, filter_letters_on_board, max_words_to_check);
                             match attempt {
                                 Some(result) => {
-                                    let previous_idxs = get_previous_idxs(&prev_state.play_sequence, &result.1);
-                                    *last_game_state = Some(GameState { board: result.0.clone(), min_col: result.2, max_col: result.3, min_row: result.4, max_row: result.5, letters, play_sequence: result.1.clone() });
-                                    return Ok(Solution { board: board_to_vec(&result.0, result.2, result.3, result.4, result.5, &previous_idxs), elapsed: now.elapsed().as_millis() });
+                                    let previous_idxs = get_board_overlap(&prev_state.board, &result.0, prev_state.min_col, prev_state.max_col, prev_state.min_row, prev_state.max_row, result.1, result.2, result.3, result.4);
+                                    undo_stack.push(last_game_state.clone());
+                                    redo_stack.clear();
+                                    *last_game_state = Some(GameState { board: result.0.clone(), min_col: result.1, max_col: result.2, min_row: result.3, max_row: result.4, letters });
+                                    return Ok(Solution { board: board_to_vec(&result.0, result.1, result.2, result.3, result.4, &previous_idxs), elapsed: now.elapsed().as_millis() });
                                 },
-                                None => {/* If we failed again, continue with the code that starts from scratch */}
+                                None => { /* We want to continue with the code that builds from scratch */ }
                             }
                         }
                     }
                 },
                 LetterComparison::GreaterByMoreThanOne => {
                     // If a letter has increased by more than one, or multiple have increased by one or more, then try playing off the existing board
-                    let valid_words_vec: Vec<Word> = state.all_words_short.iter().filter(|word| is_makeable(word, letters)).map(|word| word.clone()).collect();
-                    let valid_words_set: HashSet<Word> = HashSet::from_iter(valid_words_vec.clone());
-                    let attempt = play_existing(&prev_state.play_sequence, &valid_words_vec, &valid_words_set, &letters);
+                    let valid_words_set: HashSet<&Word> = HashSet::from_iter(dict_to_use.iter().filter(|word| is_makeable(word, &letters)));
+                    let attempt = play_existing(&prev_state.board, prev_state.min_col, prev_state.max_col, prev_state.min_row, prev_state.max_row, &letters, &valid_words_set, dict_to_use, filter_letters_on_board, max_words_to_check);
                     match attempt {
                         Some(result) => {
-                            let previous_idxs = get_previous_idxs(&prev_state.play_sequence, &result.1);
-                            *last_game_state = Some(GameState { board: result.0.clone(), min_col: result.2, max_col: result.3, min_row: result.4, max_row: result.5, letters, play_sequence: result.1.clone() });
-                            return Ok(Solution { board: board_to_vec(&result.0, result.2, result.3, result.4, result.5, &previous_idxs), elapsed: now.elapsed().as_millis() });
+                            let previous_idxs = get_board_overlap(&prev_state.board, &result.0, prev_state.min_col, prev_state.max_col, prev_state.min_row, prev_state.max_row, result.1, result.2, result.3, result.4);
+                            undo_stack.push(last_game_state.clone());
+                            redo_stack.clear();
+                            *last_game_state = Some(GameState { board: result.0.clone(), min_col: result.1, max_col: result.2, min_row: result.3, max_row: result.4, letters });
+                            return Ok(Solution { board: board_to_vec(&result.0, result.1, result.2, result.3, result.4, &previous_idxs), elapsed: now.elapsed().as_millis() });
                         },
-                        None => {/* If we failed, continue with the code that starts from scratch */}
+                        None => { /* We want to continue with the code that builds from scratch */ }
                     }
-                }
+                },
                 LetterComparison::SomeLess => {/* We just want to continue to the code that starts from scratch */}
             }
         },
@@ -1173,107 +1912,117 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
     }
     // Play from scratch
     // Get a vector of all valid words
-    let valid_words_vec: Vec<Word> = state.all_words_short.iter().filter(|word| is_makeable(word, letters)).map(|word| word.clone()).collect();
-    if valid_words_vec.len() == 0 {
+    let dict_to_use = if *state.use_long_dictionary.lock().or(Err("Failed to get lock on using long dictionary!"))? {&state.all_words_long} else {&state.all_words_short};
+    let valid_words_vec: Vec<&Word> = dict_to_use.iter().filter(|word| is_makeable(word, &letters)).collect();
+    if valid_words_vec.is_empty() {
         return Err("No valid words can be formed from the current letters - dump and try again!".to_owned());
     }
+    let valid_words_set: HashSet<&Word> = HashSet::from_iter(valid_words_vec.iter().map(|w| w.clone()));
     // Split the words to check up into appropriate chunks based on the available parallelism
-    let mut default_parallelism_approx = 1usize;
-    match thread::available_parallelism() {
-        Ok(available_parallelism) => {
-            default_parallelism_approx = available_parallelism.into();
-        },
-        _ => {}
-    }
+    let default_parallelism_approx =  thread::available_parallelism().unwrap_or(NonZeroUsize::new(1).unwrap()).get();
     let chunk_size = (valid_words_vec.len() as f32)/(default_parallelism_approx as f32);
-    let chunks: Vec<Vec<Word>> = valid_words_vec.chunks(chunk_size.ceil() as usize).map(|words| words.to_vec()).collect();
+    let mut chunks: Vec<Vec<&Word>> = vec![Vec::with_capacity(chunk_size.ceil() as usize); default_parallelism_approx];
+    for (i, word) in valid_words_vec.iter().enumerate() {
+        chunks[i % default_parallelism_approx].push(word.clone());
+    }
     // Prepare for threading/early termination using `AtomicBool`
     let stop = Arc::new(AtomicBool::new(false));
-    let mut handles: Vec<thread::JoinHandle<()>> = Vec::with_capacity(chunks.len());
-    let char_vec: Vec<(Vec<Vec<String>>, Board, usize, usize, usize, usize, PlaySequence)> = Vec::new();
+    let char_vec: Vec<(Vec<Vec<String>>, Board, usize, usize, usize, usize)> = Vec::new();
     let ret_val = Arc::new(Mutex::new(char_vec));
+    let tried: Arc<Mutex<HashSet<&Word>>> = Arc::new(Mutex::new(HashSet::new()));
+    let valid_words_vec_len = valid_words_vec.len();
+    let arc_valid_words_vec = Arc::new(valid_words_vec);
+    let arc_valid_words_set = Arc::new(valid_words_set);
     // For each thread (i.e. piece of available parallelism), spawn a new thread to check those words
     // These threads check different sets of initial words in the board, and whichever finishes first signals the others to stop
-    for chunk in chunks.into_iter() {
-        let stop_t = stop.clone();
-        let new_letters = letters.clone();
-        let copied_new_valid_words_vec = valid_words_vec.clone();
-        let conn = ret_val.clone();
-        let copied_previous_play_sequence = previous_play_sequence.clone();
-        let handle = thread::spawn(move || {
-            // Loop through each word and play it on a new board
-            for word in chunk.iter() {
+    thread::scope(|s| {
+        let mut handles: Vec<thread::ScopedJoinHandle<()>> = Vec::with_capacity(chunks.len());
+        for chunk in chunks {
+            let stop_t = stop.clone();
+            let new_letters = letters.clone();
+            let copied_new_valid_words_vec = Arc::clone(&arc_valid_words_vec);
+            let copied_valid_words_set = Arc::clone(&arc_valid_words_set);
+            let conn = Arc::clone(&ret_val);
+            let cloned_previous_board = previous_board.clone();
+            let tried_words = Arc::clone(&tried);
+            let handle = s.spawn(move || {
+                // Loop through each word and play it on a new board
+                let mut words_checked = 0;
                 let mut board = Board::new();
-                let col_start = BOARD_SIZE/2 - word.len()/2;
-                let row = BOARD_SIZE/2;
-                let mut use_letters: [usize; 26] = new_letters.clone();
-                for i in 0..word.len() {
-                    board.set_val(row, col_start+i, word[i]);
-                    use_letters[word[i]] -= 1;
-                }
-                let min_col = col_start;
-                let min_row = row;
-                let max_col = col_start + (word.len()-1);
-                let max_row = row;
-                let mut play_sequence: PlaySequence = Vec::with_capacity(50);
-                play_sequence.push((word.clone(), (row, col_start, Direction::Horizontal)));
-                if use_letters.iter().all(|count| *count == 0) {
-                    if !stop_t.load(Ordering::Relaxed) {
-                        stop_t.store(true, Ordering::Relaxed);
-                        // The expect may panic the thread but I think that's ok
-                        let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
-                        let previous_idxs: HashSet<(usize, usize)>;
-                        match copied_previous_play_sequence {
-                            Some(prev) => {
-                                previous_idxs = get_previous_idxs(&prev, &play_sequence);
-                            },
-                            None => {previous_idxs = HashSet::new();}
-                        }
-                        ret.push((board_to_vec(&board, min_col, max_col, min_row, max_row, &previous_idxs), board.clone(), min_col, max_col, min_row, max_row, play_sequence));
-                        break;
+                for word in chunk.iter() {
+                    let col_start = BOARD_SIZE/2 - word.len()/2;
+                    let row = BOARD_SIZE/2;
+                    let mut use_letters: [usize; 26] = new_letters.clone();
+                    let mut letters_on_board = [0usize; 26];
+                    for i in 0..word.len() {
+                        board.set_val(row, col_start+i, word[i]);
+                        letters_on_board[word[i]] += 1;
+                        use_letters[word[i]] -= 1;  // Should never underflow because we've verified that every word is playable with these letters
                     }
-                }
-                else {
-                    // Reduce the set of remaining words to check to those that can be played with the letters not in the first word (plus only one of the tiles played in the first word)
-                    let word_letters: HashSet<&usize> = HashSet::from_iter(word.iter());
-                    let new_valid_words_vec: Vec<Word> = copied_new_valid_words_vec.iter().filter(|word| check_filter_after_play(use_letters.clone(), word, &word_letters)).map(|word| word.clone()).collect();
-                    let valid_words_set: HashSet<Word> = HashSet::from_iter(copied_new_valid_words_vec.clone());
-                    // Begin the recursive processing
-                    let result = play_further(&mut board, min_col, max_col, min_row, max_row, &new_valid_words_vec, &valid_words_set, use_letters, 0, &mut play_sequence, &Vec::new(), &stop_t);
-                    match result {
-                        // If the result was good, then store it and signal other threads to finish (so long as another thread isn't doing so)
-                        Ok(res) => {
-                            if res.0 && !stop_t.load(Ordering::Relaxed) {
-                                stop_t.store(true, Ordering::Relaxed);
-                                // The expect will panic the thread but I think that's ok
-                                let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
-                                let previous_idxs: HashSet<(usize, usize)>;
-                                match copied_previous_play_sequence {
-                                    Some(prev) => {
-                                        previous_idxs = get_previous_idxs(&prev, &play_sequence);
-                                    },
-                                    None => {previous_idxs = HashSet::new();}
-                                }
-                                ret.push((board_to_vec(&board, res.1, res.2, res.3, res.4, &previous_idxs), board.clone(), res.1, res.2, res.3, res.4, play_sequence));
-                                break;
-                            }
-                        },
-                        // If an error (we're out of bounds or another thread signalled to stop) then we're done
-                        Err(()) => {
+                    let min_col = col_start;
+                    let min_row = row;
+                    let max_col = col_start + (word.len()-1);
+                    let max_row = row;
+                    if use_letters.iter().all(|count| *count == 0) {
+                        if !stop_t.load(Ordering::Relaxed) {
+                            stop_t.store(true, Ordering::Relaxed);
+                            let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
+                            ret.push((board_to_vec(&board, min_col, max_col, min_row, max_row, &HashSet::new()), board.clone(), min_col, max_col, min_row, max_row));
                             break;
                         }
                     }
+                    else {
+                        // Reduce the set of remaining words to check to those that can be played with the letters not in the first word (plus only one of the tiles played in the first word)
+                        let word_letters: HashSet<usize> = HashSet::from_iter(word.iter().map(|c| c.clone()));
+                        let mut new_valid_words_vec: Vec<&Word> = Vec::with_capacity(valid_words_vec_len);
+                        for w in copied_new_valid_words_vec.iter() {
+                            if check_filter_after_play(use_letters.clone(), w, &word_letters) && !tried_words.lock().expect("Failed to get lock on tried_words").contains(w) {
+                                new_valid_words_vec.push(w);
+                            }
+                        }
+                        // Begin the recursive processing
+                        let result = play_further(&mut board, min_col, max_col, min_row, max_row, &new_valid_words_vec, &copied_valid_words_set, use_letters, 0, &mut words_checked, &mut letters_on_board, filter_letters_on_board, max_words_to_check, &stop_t);
+                        match result {
+                            // If the result was good, then store it and signal other threads to finish (so long as another thread isn't doing so)
+                            Ok(res) => {
+                                if res.0 && !stop_t.load(Ordering::Relaxed) {
+                                    stop_t.store(true, Ordering::Relaxed);
+                                    // The expect will panic the thread but I think that's ok
+                                    let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
+                                    let previous_idxs: HashSet<(usize, usize)>;
+                                    match cloned_previous_board {
+                                        Some(prev) => {
+                                            previous_idxs = get_board_overlap(&prev.0, &board, prev.1, prev.2, prev.3, prev.4, res.1, res.2, res.3, res.4);
+                                        },
+                                        None => {previous_idxs = HashSet::new();}
+                                    }
+                                    ret.push((board_to_vec(&board, res.1, res.2, res.3, res.4, &previous_idxs), board.clone(), res.1, res.2, res.3, res.4));
+                                    break;
+                                }
+                                else {
+                                    tried_words.lock().expect("Failed to get lock on tried words").insert(word);
+                                }
+                            },
+                            // If an error (we're out of bounds or another thread signalled to stop) then we're done
+                            Err(()) => {
+                                break;
+                            }
+                        }
+                    }
+                    for col in min_col..=max_col {
+                        board.set_val(row, col, EMPTY_VALUE);
+                    }
                 }
-            }
-        });
-        handles.push(handle);
-    }
-    // Wait for all the threads
-    for handle in handles.into_iter() {
-        let _res = handle.join();
-    }
+            });
+            handles.push(handle);
+        }
+        // Wait for all the threads
+        for handle in handles {
+            let _res = handle.join();
+        }
+    });
     // If we're done, store the result in the `State` and return the result to the frontend
-    let ret: std::sync::MutexGuard<'_, Vec<(Vec<Vec<String>>, Board, usize, usize, usize, usize, Vec<(Vec<usize>, (usize, usize, Direction))>)>>;
+    let ret: std::sync::MutexGuard<'_, Vec<(Vec<Vec<String>>, Board, usize, usize, usize, usize)>>;
     match ret_val.lock() {
         Ok(locked) => {
             ret = locked;
@@ -1283,113 +2032,22 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
         }
     }
     if ret.len() > 0 {
-        *last_game_state = Some(GameState { board: ret[0].1.clone(), min_col: ret[0].2, max_col: ret[0].3, min_row: ret[0].4, max_row: ret[0].5, letters, play_sequence: ret[0].6.clone() });
+        undo_stack.push(last_game_state.clone());
+        redo_stack.clear();
+        *last_game_state = Some(GameState { board: ret[0].1.clone(), min_col: ret[0].2, max_col: ret[0].3, min_row: ret[0].4, max_row: ret[0].5, letters });
         return Ok(Solution { board: ret[0].0.clone(), elapsed: now.elapsed().as_millis() });
-    }
-    // Try again with all words in the Scrabble dictionary; this could potentially take much longer but is done just to be exhaustive
-    let valid_words_vec: Vec<Word> = state.all_words_long.iter().filter(|word| is_makeable(word, letters)).map(|word| word.clone()).collect();
-    if valid_words_vec.len() == 0 {
-        return Err("No valid words can be formed from the current letters - dump and try again!".to_owned());
-    }
-    let chunks: Vec<Vec<Word>> = valid_words_vec.chunks(chunk_size.ceil() as usize).map(|words| words.to_vec()).collect();
-    let stop = Arc::new(AtomicBool::new(false));
-    let mut handles: Vec<thread::JoinHandle<()>> = Vec::with_capacity(chunks.len());
-    let char_vec: Vec<(Vec<Vec<String>>, Board, usize, usize, usize, usize, PlaySequence)> = Vec::new();
-    let ret_val = Arc::new(Mutex::new(char_vec));
-    for chunk in chunks.into_iter() {
-        let stop_t = stop.clone();
-        let new_letters = letters.clone();
-        let copied_new_valid_words_vec = valid_words_vec.clone();
-        let conn = ret_val.clone();
-        let copied_previous_play_sequence = previous_play_sequence.clone();
-        let handle = thread::spawn(move || {
-            for word in chunk.iter() {
-                let mut board = Board::new();
-                let col_start = BOARD_SIZE/2 - word.len()/2;
-                let row = BOARD_SIZE/2;
-                let mut use_letters = new_letters.clone();
-                for i in 0..word.len() {
-                    board.set_val(row, col_start+i, word[i]);
-                    use_letters[word[i]] -= 1;
-                }
-                let min_col = col_start;
-                let min_row = row;
-                let max_col = col_start + (word.len()-1);
-                let max_row = row;
-                let mut play_sequence: PlaySequence = Vec::with_capacity(50);
-                play_sequence.push((word.clone(), (row, col_start, Direction::Horizontal)));
-                if use_letters.iter().all(|count| *count == 0) {
-                    if !stop_t.load(Ordering::Relaxed) {
-                        stop_t.store(true, Ordering::Relaxed);
-                        // The expect may panic the thread but I think that's ok
-                        let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
-                        let previous_idxs: HashSet<(usize, usize)>;
-                        match copied_previous_play_sequence {
-                            Some(prev) => {
-                                previous_idxs = get_previous_idxs(&prev, &play_sequence);
-                            },
-                            None => {previous_idxs = HashSet::new();}
-                        }
-                        ret.push((board_to_vec(&board, min_col, max_col, min_row, max_row, &previous_idxs), board.clone(), min_col, max_col, min_row, max_row, play_sequence));
-                        break;
-                    }
-                }
-                else {
-                    let word_letters: HashSet<&usize> = HashSet::from_iter(word.iter());
-                    let new_valid_words_vec: Vec<Word> = copied_new_valid_words_vec.iter().filter(|word| check_filter_after_play(use_letters.clone(), word, &word_letters)).map(|word| word.clone()).collect();
-                    let valid_words_set: HashSet<Word> = HashSet::from_iter(copied_new_valid_words_vec.clone());
-                    let result = play_further(&mut board, min_col, max_col, min_row, max_row, &new_valid_words_vec, &valid_words_set, use_letters, 0, &mut play_sequence, &Vec::new(), &stop_t);
-                    match result {
-                        Ok(res) => {
-                            if res.0 && !stop_t.load(Ordering::Relaxed) {
-                                stop_t.store(true, Ordering::Relaxed);
-                                // The expect will panic the thread but I think that's ok
-                                let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
-                                let previous_idxs: HashSet<(usize, usize)>;
-                                match copied_previous_play_sequence {
-                                    Some(prev) => {
-                                        previous_idxs = get_previous_idxs(&prev, &play_sequence);
-                                    },
-                                    None => {previous_idxs = HashSet::new();}
-                                }
-                                ret.push((board_to_vec(&board, res.1, res.2, res.3, res.4, &previous_idxs), board.clone(), res.1, res.2, res.3, res.4, play_sequence));
-                                break;
-                            }
-                        },
-                        Err(()) => {
-                            break;
-                        }
-                    }
-                }
-            }
-        });
-        handles.push(handle);
-    }
-    for handle in handles.into_iter() {
-        let _res = handle.join();
-    }
-    let ret_long: std::sync::MutexGuard<'_, Vec<(Vec<Vec<String>>, Board, usize, usize, usize, usize, Vec<(Vec<usize>, (usize, usize, Direction))>)>>;
-    match ret_val.lock() {
-        Ok(locked) => {
-            ret_long = locked;
-        },
-        _ => {
-            return Err("Failed to get lock on shared ret_val when checking return".to_owned());
-        }
-    }
-    if ret_long.len() > 0 {
-        *last_game_state = Some(GameState { board: ret_long[0].1.clone(), min_col: ret_long[0].2, max_col: ret_long[0].3, min_row: ret_long[0].4, max_row: ret_long[0].5, letters, play_sequence: ret_long[0].6.clone() });
-        return Ok(Solution { board: ret_long[0].0.clone(), elapsed: now.elapsed().as_millis() });
     }
     return Err("No solution found - dump and try again!".to_owned());
 }
 
 fn main() {
-    let all_words_short: Vec<Word> = include_str!("short_dictionary.txt").lines().map(convert_word_to_array).collect();
-    let all_words_long: Vec<Word> = include_str!("dictionary.txt").lines().map(convert_word_to_array).collect();
+    let mut all_words_short: Vec<Word> = include_str!("updated_short_dictionary.txt").lines().map(convert_word_to_array).collect();
+    all_words_short.sort_by(|a, b| b.len().cmp(&a.len()));
+    let mut all_words_long: Vec<Word> = include_str!("dictionary.txt").lines().map(convert_word_to_array).collect();
+    all_words_long.sort_by(|a, b| b.len().cmp(&a.len()));
     tauri::Builder::default()
-        .manage(AppState { all_words_short, all_words_long, last_game: None.into() })
-        .invoke_handler(tauri::generate_handler![play_bananagrams, reset, get_playable_words, get_random_letters])
+        .manage(AppState { all_words_short, all_words_long, last_game: None.into(), undo_stack: Vec::new().into(), redo_stack: Vec::new().into(), filter_letters_on_board: 2.into(), maximum_words_to_check: 50_000.into(), use_long_dictionary: false.into() })
+        .invoke_handler(tauri::generate_handler![play_bananagrams, reset, get_playable_words, get_random_letters, get_settings, set_settings, undo, redo])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

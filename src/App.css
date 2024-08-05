@@ -4,6 +4,7 @@ body {
 
 #results-table {
   z-index: 2;
+  cursor: grab;
 }
 
 .results-tbody {
@@ -63,6 +64,7 @@ body {
   justify-content: center;
   margin-left: 15px;
   margin-right: 15px;
+  margin-top: 5px;
 }
 
 .reset-dropdown {
@@ -75,4 +77,13 @@ body {
 .reset-dropdown-item:hover {
   background-color: rgb(218, 66, 66) !important;
   color: white !important;
+}
+
+.settings-div {
+  margin-bottom: 5px;
+}
+
+.info-overlay {
+  margin-left: 5px;
+  cursor: help;
 }
