@@ -1,0 +1,46 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Tries to play a word vertically anywhere on the `board`"><title>try_play_word_vertically in bananagrams_solver - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="bananagrams_solver" data-themes="" data-resource-suffix="" data-rustdoc-version="1.80.0 (051478957 2024-07-21)" data-channel="1.80.0" data-search-js="search-d52510db62a78183.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../static.files/storage-118b08c4c78b968e.js"></script><script defer src="sidebar-items.js"></script><script defer src="../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc fn"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../bananagrams_solver/index.html">bananagrams_solver</a><span class="version">1.5.0</span></h2></div><div class="sidebar-elems"></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1>Function <a href="index.html">bananagrams_solver</a>::<wbr><a class="fn" href="#">try_play_word_vertically</a><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><span class="out-of-band"><a class="src" href="../src/bananagrams_solver/main.rs.html#1005-1050">source</a> · <button id="toggle-all-docs" title="collapse all docs">[<span>&#x2212;</span>]</button></span></div><pre class="rust item-decl"><code>pub(crate) fn try_play_word_vertically(
+    board: &amp;mut <a class="struct" href="struct.Board.html" title="struct bananagrams_solver::Board">Board</a>,
+    word: &amp;<a class="struct" href="https://doc.rust-lang.org/1.80.0/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.usize.html">usize</a>&gt;,
+    min_col: <a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.usize.html">usize</a>,
+    max_col: <a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.usize.html">usize</a>,
+    min_row: <a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.usize.html">usize</a>,
+    max_row: <a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.usize.html">usize</a>,
+    valid_words_vec: &amp;<a class="struct" href="https://doc.rust-lang.org/1.80.0/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;&amp;<a class="struct" href="https://doc.rust-lang.org/1.80.0/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.usize.html">usize</a>&gt;&gt;,
+    valid_words_set: &amp;HashSet&lt;&amp;<a class="struct" href="https://doc.rust-lang.org/1.80.0/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.usize.html">usize</a>&gt;&gt;,
+    letters: [<a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.usize.html">usize</a>; <a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.array.html">26</a>],
+    depth: <a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.usize.html">usize</a>,
+    words_checked: &amp;mut <a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.usize.html">usize</a>,
+    letters_on_board: &amp;mut [<a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.usize.html">usize</a>; <a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.array.html">26</a>],
+    filter_letters_on_board: <a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.usize.html">usize</a>,
+    max_words_to_check: <a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.usize.html">usize</a>,
+    stop_t: &amp;<a class="struct" href="https://doc.rust-lang.org/1.80.0/alloc/sync/struct.Arc.html" title="struct alloc::sync::Arc">Arc</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.80.0/core/sync/atomic/struct.AtomicBool.html" title="struct core::sync::atomic::AtomicBool">AtomicBool</a>&gt;,
+) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.80.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="enum" href="https://doc.rust-lang.org/1.80.0/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;(<a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.bool.html">bool</a>, <a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.usize.html">usize</a>, <a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.usize.html">usize</a>, <a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.usize.html">usize</a>, <a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.usize.html">usize</a>)&gt;, <a class="primitive" href="https://doc.rust-lang.org/1.80.0/std/primitive.unit.html">()</a>&gt;</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Tries to play a word vertically anywhere on the <code>board</code></p>
+<h2 id="arguments"><a class="doc-anchor" href="#arguments">§</a>Arguments</h2>
+<ul>
+<li><code>board</code> - The <code>Board</code> to modify in-place</li>
+<li><code>word</code> - Word to try to play</li>
+<li><code>min_col</code> - Minimum occupied column index in <code>board</code></li>
+<li><code>max_col</code> - Maximum occupied column index in <code>board</code></li>
+<li><code>min_row</code> - Minimum occupied row index in <code>board</code></li>
+<li><code>max_row</code> - Maximum occupied row index in <code>board</code></li>
+<li><code>valid_words_vec</code> - Vector of vectors, each representing a word (see <code>convert_word_to_array</code>)</li>
+<li><code>valid_words_set</code> - HashSet of vectors, each representing a word (a HashSet version of <code>valid_words_vec</code> for faster membership checking)</li>
+<li><code>letters</code> - Length-26 array of the number of each letter in the hand</li>
+<li><code>depth</code> - Depth of the current recursive call</li>
+<li><code>words_checked</code> - The number of words checked in total</li>
+<li><code>letters_on_board</code> - Length-26 array of the number of each letter currently present on the <code>board</code></li>
+<li><code>filter_letters_on_board</code> - Maximum number of letters currently on the board that can be used in a newly played word</li>
+<li><code>max_words_to_check</code> - Maximum number of words to check before stopping</li>
+<li><code>stop_t</code> - <code>AtomicBool</code> that, when set, indicates that processing should stop</li>
+</ul>
+<h2 id="returns"><a class="doc-anchor" href="#returns">§</a>Returns</h2>
+<p><em><code>Result</code> with <code>Option</code> upon success with:</em></p>
+<ul>
+<li><code>bool</code> - Whether the word could be validly played</li>
+<li><code>usize</code> - Minimum occupied column index in <code>board</code></li>
+<li><code>usize</code> - Maximum occupied column index in <code>board</code></li>
+<li><code>usize</code> - Minimum occupied row index in <code>board</code></li>
+<li><code>usize</code> - Maximum occupied row index in <code>board</code></li>
+</ul>
+<p><em>or <code>None</code> if no valid playing location was found, or empty <code>Err</code> if another thread signalled to stop</em></p>
+</div></details></section></div></main></body></html>

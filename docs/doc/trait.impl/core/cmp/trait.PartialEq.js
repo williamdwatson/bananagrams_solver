@@ -1,3 +1,3 @@
 (function() {var implementors = {
-"bananagrams_solver":[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.77.2/core/cmp/trait.PartialEq.html\" title=\"trait core::cmp::PartialEq\">PartialEq</a> for <a class=\"enum\" href=\"bananagrams_solver/enum.Direction.html\" title=\"enum bananagrams_solver::Direction\">Direction</a>"]]
+"bananagrams_solver":[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.80.0/core/cmp/trait.PartialEq.html\" title=\"trait core::cmp::PartialEq\">PartialEq</a> for <a class=\"enum\" href=\"bananagrams_solver/enum.Direction.html\" title=\"enum bananagrams_solver::Direction\">Direction</a>"]]
 };if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
