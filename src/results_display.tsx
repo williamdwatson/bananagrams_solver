@@ -7,6 +7,7 @@ import { Toast } from "primereact/toast";
 import html2canvas from "html2canvas";
 import SolutionTime from "./solution_time";
 import { result_t } from "./types";
+import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
 
 interface ResultsDisplayProps {
     /**
@@ -189,27 +190,31 @@ export default function ResultsDisplay(props: ResultsDisplayProps) {
         <ContextMenu model={items} ref={cm}/>
         {props.results == null || props.results.board.length === 0 ? null :
         <>
-        <table id="results-table">
-            <tbody className="results-tbody">
-                {props.results.board.map((row, i) => {
-                    return (
-                        <tr key={"row-"+i} className="results-tr">
-                            {row.map((val, j) => {
-                                if (val.trim() === "") {
-                                    return <td key={"row-"+i+"-cell-"+j} className="emptyCell"></td>
-                                }
-                                else if (val.length === 2) {
-                                    return <td key={"row-"+i+"-cell-"+j} className="previouslyPlayedCell">{val.charAt(0)}</td>
-                                }
-                                else {
-                                    return <td key={"row-"+i+"-cell-"+j} className="occupiedCell">{val}</td>
-                                }
-                            })}
-                        </tr>
-                    )
-                })}
-            </tbody>
-        </table>
+        <TransformWrapper centerOnInit onPanningStart={() => document.getElementById("results-table")!.style.cursor = "grabbing"} onPanningStop={() => document.getElementById("results-table")!.style.cursor = "grab"}>
+            <TransformComponent wrapperStyle={{width: "100%", height: "calc(100% - 4ch)"}}>
+                <table id="results-table">
+                    <tbody className="results-tbody">
+                        {props.results.board.map((row, i) => {
+                            return (
+                                <tr key={"row-"+i} className="results-tr">
+                                    {row.map((val, j) => {
+                                        if (val.trim() === "") {
+                                            return <td key={"row-"+i+"-cell-"+j} className="emptyCell"></td>
+                                        }
+                                        else if (val.length === 2) {
+                                            return <td key={"row-"+i+"-cell-"+j} className="previouslyPlayedCell">{val.charAt(0)}</td>
+                                        }
+                                        else {
+                                            return <td key={"row-"+i+"-cell-"+j} className="occupiedCell">{val}</td>
+                                        }
+                                    })}
+                                </tr>
+                            )
+                        })}
+                    </tbody>
+                </table>
+            </TransformComponent>
+        </TransformWrapper>
         <SolutionTime time={props.results.elapsed} num_letters={num_letters} density={density}/>
         </>
         }

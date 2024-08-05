@@ -22,6 +22,8 @@ export default function App() {
     const [playableWordsVisible, setPlayableWordsVisible] = useState(false);
     const [playableWords, setPlayableWords] = useState<{short: string[], long: string[]}|null>(null);
     const [panelSizes, setPanelSizes] = useState<number[]>([25, 75]);
+    const [undoPossible, setUndoPossible] = useState(false);
+    const [redoPossible, setRedoPossible] = useState(false);
 
     // Disable right-clicking elsewhere on the page
     // useEffect(() => {
@@ -38,6 +40,8 @@ export default function App() {
             .then(res => {
                 const results = res as result_t;
                 setResults(results);
+                setUndoPossible(true);
+                setRedoPossible(false);
                 if (results.elapsed > 5000) {
                     sendNotification({ title: "Completed", body: "The board has been solved!" });
                 }
@@ -54,6 +58,7 @@ export default function App() {
     const clearResults = () => {
         if (!running) {
             invoke("reset").then(()=> {
+                setUndoPossible(true);
                 setResults(null);
             })
             .catch(error => {
@@ -68,10 +73,13 @@ export default function App() {
         <PlayableWords playableWords={playableWords} visible={playableWordsVisible} setVisible={setPlayableWordsVisible}/>
         <Splitter style={{height: "98vh"}} onResizeEnd={e => setPanelSizes(e.sizes)}>
             <SplitterPanel size={panelSizes[0]} pt={{root: {onContextMenu: e => setLetterInputContextMenu(e)}}}>
-                <LetterInput toast={toast} startRunning={startRunning} running={running} contextMenu={letterInputContextMenu} setPlayableWords={setPlayableWords} setPlayableWordsVisible={setPlayableWordsVisible} clearResults={clearResults}/>
+                <LetterInput toast={toast} startRunning={startRunning} running={running} contextMenu={letterInputContextMenu}
+                             setPlayableWords={setPlayableWords} setPlayableWordsVisible={setPlayableWordsVisible}
+                             clearResults={clearResults} undoPossible={undoPossible} redoPossible={redoPossible}
+                             setUndoPossible={setUndoPossible} setRedoPossible={setRedoPossible} setResults={setResults}/>
                 <Settings toast={toast}/>
             </SplitterPanel>
-            <SplitterPanel size={panelSizes[1]} style={{display: "flex", justifyContent: "center", alignItems: "center"}} pt={{root: {onContextMenu: e => setResultsContextMenu(e)}}}>
+            <SplitterPanel size={panelSizes[1]} pt={{root: {onContextMenu: e => setResultsContextMenu(e)}}}>
                 <ResultsDisplay toast={toast} results={results} contextMenu={resultsContextMenu} clearResults={clearResults} running={running} panelWidth={panelSizes[1]}/>
             </SplitterPanel>
         </Splitter>

@@ -342,6 +342,16 @@ fn get_new_min_max(board: &Board, old_min_col: usize, old_max_col: usize, old_mi
     return (min_col, max_col, min_row, max_row);
 }
 
+/// Checks whether the `board` is fully connected; this code is mostly from ChatGPT
+/// # Arguments
+/// * `board` - Board to check
+/// * `min_col` - The minimum played column
+/// * `max_col` - The maximum played column
+/// * `min_row` - The minimum played row
+/// * `max_row` - The maximum played row
+/// * `ignore_cells` - Locations to ignore
+/// # Returns
+/// * `bool` - Whether `board` is fully connected
 fn is_connected(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, ignored_cells: &Vec<(usize, usize)>) -> bool {
     // Create a HashSet from the ignored cells for efficient lookup
     let ignored_cells: HashSet<_> = ignored_cells.into_iter().collect();
@@ -1495,6 +1505,7 @@ struct Solution {
 }
 
 /// The previous game state
+#[derive(Clone)]
 struct GameState {
     /// The previous board
     board: Board,
@@ -1516,6 +1527,10 @@ struct AppState {
     all_words_short: Vec<Word>,
     /// Complete Scrabble dictionary
     all_words_long: Vec<Word>,
+    /// Stack of previous solutions
+    undo_stack: Mutex<Vec<Option<GameState>>>,
+    /// Stack of undone solutions
+    redo_stack: Mutex<Vec<Option<GameState>>>,
     /// The last game state (if `None`, then no previous game has been played)
     last_game: Mutex<Option<GameState>>,
     /// Number of letters present on the board that can be used in a word (higher will result in fewer words being filtered out)
@@ -1535,6 +1550,85 @@ struct CurrentSettings {
     maximum_words_to_check: usize,
     /// Whether to use the long dictionary or the short one
     use_long_dictionary: bool
+}
+
+/// Represents a game undo or redo
+#[derive(Serialize)]
+struct UndoRedo {
+    /// The previous solution
+    solution: Vec<Vec<String>>,
+    /// The letters in the previous hand
+    letters: HashMap<char, u64>,
+    /// Whether an undo can be performed
+    undo_possible: bool,
+    /// Whether a redo can be performed
+    redo_possible: bool
+}
+
+/// Undoes a previous play
+#[tauri::command]
+fn undo(state: State<'_, AppState>) -> Result<UndoRedo, String> {
+    let mut undo_stack = state.undo_stack.lock().or(Err("Failed to get lock on undo stack!"))?;
+    let mut redo_stack = state.redo_stack.lock().or(Err("Failed to get lock on redo stack!"))?;
+    let mut game_state = state.last_game.lock().or(Err("Failed to get on last game!"))?;
+    if let Some(prev_state) = undo_stack.pop() {
+        redo_stack.push(game_state.clone());
+        *game_state = prev_state.clone();
+        match prev_state {
+            Some(p) => {
+                let mut letters = HashMap::new();
+                for (c, n) in UPPERCASE.chars().into_iter().zip(p.letters) {
+                    letters.insert(c, n as u64);
+                }
+                return Ok(UndoRedo {
+                    solution: board_to_vec(&p.board, p.min_col, p.max_col, p.min_row, p.max_row, &HashSet::new()),
+                    letters,
+                    undo_possible: undo_stack.len() > 0,
+                    redo_possible: true
+                });
+            },
+            None => {
+                let letters: HashMap<char, u64> = UPPERCASE.chars().into_iter().map(|c| (c, 0)).collect();
+                return Ok(UndoRedo { solution: Vec::new(), letters, undo_possible: undo_stack.len() > 0, redo_possible: true });
+            }
+        }
+    }
+    else {
+        return Err("No undos available!".to_owned());
+    }
+}
+
+/// Redoes an undone play
+#[tauri::command]
+fn redo(state: State<'_, AppState>) -> Result<UndoRedo, String> {
+    let mut undo_stack = state.undo_stack.lock().or(Err("Failed to get lock on undo stack!"))?;
+    let mut redo_stack = state.redo_stack.lock().or(Err("Failed to get lock on redo stack!"))?;
+    let mut game_state = state.last_game.lock().or(Err("Failed to get on last game!"))?;
+    if let Some(prev_state) = redo_stack.pop() {
+        undo_stack.push(game_state.clone());
+        *game_state = prev_state.clone();
+        match prev_state {
+            Some(p) => {
+                let mut letters = HashMap::new();
+                for (c, n) in UPPERCASE.chars().into_iter().zip(p.letters) {
+                    letters.insert(c, n as u64);
+                }
+                return Ok(UndoRedo {
+                    solution: board_to_vec(&p.board, p.min_col, p.max_col, p.min_row, p.max_row, &HashSet::new()),
+                    letters,
+                    undo_possible: undo_stack.len() > 0,
+                    redo_possible: redo_stack.len() > 0
+                });
+            },
+            None => {
+                let letters: HashMap<char, u64> = UPPERCASE.chars().into_iter().map(|c| (c, 0)).collect();
+                return Ok(UndoRedo { solution: Vec::new(), letters, undo_possible: undo_stack.len() > 0, redo_possible: redo_stack.len() > 0 });
+            }
+        }
+    }
+    else {
+        return Err("No redos available!".to_owned());
+    }
 }
 
 /// Generates random letters based on user input
@@ -1700,6 +1794,10 @@ fn get_settings(state: State<'_, AppState>) -> Result<CurrentSettings, String> {
 #[tauri::command]
 async fn reset(state: State<'_, AppState>) -> Result<(), String> {
     let mut last_game_state = state.last_game.lock().or(Err("Failed to get lock on the last game state"))?;
+    let mut undo_stack = state.undo_stack.lock().or(Err("Failed to get lock on undo stack!"))?;
+    let mut redo_stack = state.redo_stack.lock().or(Err("Failed to get lock on redo stack!"))?;
+    undo_stack.push(last_game_state.clone());
+    redo_stack.clear();
     *last_game_state = None;
     Ok(())
 }
@@ -1732,15 +1830,9 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
         }
     }
     // Check whether a board has been played already
-    let mut last_game_state: std::sync::MutexGuard<'_, Option<GameState>>;
-    match state.last_game.lock() {
-        Ok(locked) => {
-            last_game_state = locked;
-        },
-        _ => {
-            return Err("Failed to get lock on last game state".to_owned());
-        }
-    }
+    let mut last_game_state = state.last_game.lock().or(Err("Failed to get lock on last game state"))?;
+    let mut undo_stack = state.undo_stack.lock().or(Err("Failed to get lock on undo stack!"))?;
+    let mut redo_stack = state.redo_stack.lock().or(Err("Failed to get lock on redo stack!"))?;
     let max_words_to_check = *state.maximum_words_to_check.lock().or(Err("Failed to get lock on maximum words!"))?;
     let filter_letters_on_board = *state.filter_letters_on_board.lock().or(Err("Failed to get lock on maximum board letters!"))?;
     let mut previous_board: Option<BoardAndIdxs> = None;
@@ -1777,6 +1869,8 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                     match res {
                         Some(result) => {
                             let previous_idxs = get_board_overlap(&prev_state.board, &board, prev_state.min_col, prev_state.max_col, prev_state.min_row, prev_state.max_row, result.2, result.3, result.4, result.5);
+                            undo_stack.push(last_game_state.clone());
+                            redo_stack.clear();
                             *last_game_state = Some(GameState { board: board.clone(), min_col: result.2, max_col: result.3, min_row: result.4, max_row: result.5, letters });
                             return Ok(Solution { board: board_to_vec(&board, result.2, result.3, result.4, result.5, &previous_idxs), elapsed: now.elapsed().as_millis() });
                         },
@@ -1786,6 +1880,8 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                             match attempt {
                                 Some(result) => {
                                     let previous_idxs = get_board_overlap(&prev_state.board, &result.0, prev_state.min_col, prev_state.max_col, prev_state.min_row, prev_state.max_row, result.1, result.2, result.3, result.4);
+                                    undo_stack.push(last_game_state.clone());
+                                    redo_stack.clear();
                                     *last_game_state = Some(GameState { board: result.0.clone(), min_col: result.1, max_col: result.2, min_row: result.3, max_row: result.4, letters });
                                     return Ok(Solution { board: board_to_vec(&result.0, result.1, result.2, result.3, result.4, &previous_idxs), elapsed: now.elapsed().as_millis() });
                                 },
@@ -1801,6 +1897,8 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                     match attempt {
                         Some(result) => {
                             let previous_idxs = get_board_overlap(&prev_state.board, &result.0, prev_state.min_col, prev_state.max_col, prev_state.min_row, prev_state.max_row, result.1, result.2, result.3, result.4);
+                            undo_stack.push(last_game_state.clone());
+                            redo_stack.clear();
                             *last_game_state = Some(GameState { board: result.0.clone(), min_col: result.1, max_col: result.2, min_row: result.3, max_row: result.4, letters });
                             return Ok(Solution { board: board_to_vec(&result.0, result.1, result.2, result.3, result.4, &previous_idxs), elapsed: now.elapsed().as_millis() });
                         },
@@ -1934,6 +2032,8 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
         }
     }
     if ret.len() > 0 {
+        undo_stack.push(last_game_state.clone());
+        redo_stack.clear();
         *last_game_state = Some(GameState { board: ret[0].1.clone(), min_col: ret[0].2, max_col: ret[0].3, min_row: ret[0].4, max_row: ret[0].5, letters });
         return Ok(Solution { board: ret[0].0.clone(), elapsed: now.elapsed().as_millis() });
     }
@@ -1946,8 +2046,8 @@ fn main() {
     let mut all_words_long: Vec<Word> = include_str!("dictionary.txt").lines().map(convert_word_to_array).collect();
     all_words_long.sort_by(|a, b| b.len().cmp(&a.len()));
     tauri::Builder::default()
-        .manage(AppState { all_words_short, all_words_long, last_game: None.into(), filter_letters_on_board: 2.into(), maximum_words_to_check: 50_000.into(), use_long_dictionary: false.into() })
-        .invoke_handler(tauri::generate_handler![play_bananagrams, reset, get_playable_words, get_random_letters, get_settings, set_settings])
+        .manage(AppState { all_words_short, all_words_long, last_game: None.into(), undo_stack: Vec::new().into(), redo_stack: Vec::new().into(), filter_letters_on_board: 2.into(), maximum_words_to_check: 50_000.into(), use_long_dictionary: false.into() })
+        .invoke_handler(tauri::generate_handler![play_bananagrams, reset, get_playable_words, get_random_letters, get_settings, set_settings, undo, redo])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

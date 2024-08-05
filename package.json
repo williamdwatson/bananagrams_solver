@@ -16,7 +16,8 @@
         "primeicons": "^6.0.1",
         "primereact": "^9.6.2",
         "react": "^18.2.0",
-        "react-dom": "^18.2.0"
+        "react-dom": "^18.2.0",
+        "react-zoom-pan-pinch": "^3.6.1"
     },
     "devDependencies": {
         "@tauri-apps/cli": "1.4",
