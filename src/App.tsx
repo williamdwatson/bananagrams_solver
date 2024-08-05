@@ -26,9 +26,9 @@ export default function App() {
     const [redoPossible, setRedoPossible] = useState(false);
 
     // Disable right-clicking elsewhere on the page
-    // useEffect(() => {
-    //     document.addEventListener("contextmenu", e => e.preventDefault());
-    // }, []);
+    useEffect(() => {
+        document.addEventListener("contextmenu", e => e.preventDefault());
+    }, []);
 
     /**
      * Runs the solver
