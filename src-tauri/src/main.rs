@@ -1917,13 +1917,13 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
     if valid_words_vec.is_empty() {
         return Err("No valid words can be formed from the current letters - dump and try again!".to_owned());
     }
-    let valid_words_set: HashSet<&Word> = HashSet::from_iter(valid_words_vec.iter().map(|w| w.clone()));
+    let valid_words_set: HashSet<&Word> = HashSet::from_iter(valid_words_vec.iter().map(|w| *w));
     // Split the words to check up into appropriate chunks based on the available parallelism
     let default_parallelism_approx =  thread::available_parallelism().unwrap_or(NonZeroUsize::new(1).unwrap()).get();
     let chunk_size = (valid_words_vec.len() as f32)/(default_parallelism_approx as f32);
     let mut chunks: Vec<Vec<&Word>> = vec![Vec::with_capacity(chunk_size.ceil() as usize); default_parallelism_approx];
     for (i, word) in valid_words_vec.iter().enumerate() {
-        chunks[i % default_parallelism_approx].push(word.clone());
+        chunks[i % default_parallelism_approx].push(*word);
     }
     // Prepare for threading/early termination using `AtomicBool`
     let stop = Arc::new(AtomicBool::new(false));

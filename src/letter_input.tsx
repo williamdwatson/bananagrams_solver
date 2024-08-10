@@ -516,7 +516,6 @@ export default function LetterInput(props: LetterInputProps){
      */
     const redo = () => {
         invoke("redo").then((res: any) => {
-            console.log(res);
             const new_map = new Map<string, number>();
             UPPERCASE.forEach(c => {
                 new_map.set(c, res.letters[c] ?? 0);

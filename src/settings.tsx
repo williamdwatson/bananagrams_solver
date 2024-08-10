@@ -24,7 +24,7 @@ export default function Settings(props: SettingsProps) {
     const [showSettings, setShowSettings] = useState(false);
     const [filterLettersOnBoard, setFilterLettersOnBoard] = useState<number|null>(2);
     const [whichDictionary, setWhichDictionary] = useState<"Short"|"Full">("Short");
-    const [maximumWordsToCheck, setMaximumWordsToCheck] = useState<number|null>(50000);
+    const [maximumWordsToCheck, setMaximumWordsToCheck] = useState<number|null>(50_000);
     const [aboutVisible, setAboutVisible] = useState(false);
     const filterLettersInfo = useRef<OverlayPanel>(null);
     const maxWordsInfo = useRef<OverlayPanel>(null);
@@ -33,9 +33,11 @@ export default function Settings(props: SettingsProps) {
     // Get the available settings whenever the popup is shown
     useEffect(() => {
         if (showSettings) {
-            invoke("get_settings").then(res => {
-                console.log(res);
-            })
+            invoke("get_settings").then((res: any) => {
+                setFilterLettersOnBoard(res.filter_letters_on_board);
+                setMaximumWordsToCheck(res.maximum_words_to_check);
+                setWhichDictionary(res.use_long_dictionary ? "Full" : "Short")
+            });
         }
     }, [showSettings]);
 
