@@ -1,6 +1,6 @@
 [package]
 name = "bananagrams_solver"
-version = "1.5.0"
+version = "1.5.1"
 description = "A basic Bananagrams solver"
 authors = ["William Watson"]
 license = ""
