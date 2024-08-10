@@ -3970,13 +3970,13 @@
     <span class="kw">if </span>valid_words_vec.is_empty() {
         <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">"No valid words can be formed from the current letters - dump and try again!"</span>.to_owned());
     }
-    <span class="kw">let </span>valid_words_set: HashSet&lt;<span class="kw-2">&amp;</span>Word&gt; = HashSet::from_iter(valid_words_vec.iter().map(|w| w.clone()));
+    <span class="kw">let </span>valid_words_set: HashSet&lt;<span class="kw-2">&amp;</span>Word&gt; = HashSet::from_iter(valid_words_vec.iter().map(|w| <span class="kw-2">*</span>w));
     <span class="comment">// Split the words to check up into appropriate chunks based on the available parallelism
     </span><span class="kw">let </span>default_parallelism_approx =  thread::available_parallelism().unwrap_or(NonZeroUsize::new(<span class="number">1</span>).unwrap()).get();
     <span class="kw">let </span>chunk_size = (valid_words_vec.len() <span class="kw">as </span>f32)/(default_parallelism_approx <span class="kw">as </span>f32);
     <span class="kw">let </span><span class="kw-2">mut </span>chunks: Vec&lt;Vec&lt;<span class="kw-2">&amp;</span>Word&gt;&gt; = <span class="macro">vec!</span>[Vec::with_capacity(chunk_size.ceil() <span class="kw">as </span>usize); default_parallelism_approx];
     <span class="kw">for </span>(i, word) <span class="kw">in </span>valid_words_vec.iter().enumerate() {
-        chunks[i % default_parallelism_approx].push(word.clone());
+        chunks[i % default_parallelism_approx].push(<span class="kw-2">*</span>word);
     }
     <span class="comment">// Prepare for threading/early termination using `AtomicBool`
     </span><span class="kw">let </span>stop = Arc::new(AtomicBool::new(<span class="bool-val">false</span>));
