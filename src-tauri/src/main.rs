@@ -89,14 +89,22 @@ impl Board {
         match direction {
             Direction::Horizontal => {
                 let mut remaining_letters = letters.clone();
-                if col_idx + word.len() >= BOARD_SIZE {
+                if col_idx + word.len() > BOARD_SIZE {
                     return (false, played_indices, remaining_letters, LetterUsage::Remaining);
                 }
-                // Check if the word will start or end at a letter
-                let mut valid_loc = (col_idx != 0 && self.get_val(row_idx, col_idx-1) != EMPTY_VALUE) || (BOARD_SIZE-col_idx <= word.len() && self.get_val(row_idx, col_idx+word.len()) != EMPTY_VALUE);
-                // Check if the word will border any letters on the top or bottom
-                valid_loc |= (col_idx..col_idx+word.len()).any(|c_idx| (row_idx < BOARD_SIZE-1 && self.get_val(row_idx+1, c_idx) != EMPTY_VALUE) || (row_idx > 0 && self.get_val(row_idx-1, c_idx) != EMPTY_VALUE));
-                if !valid_loc {
+                // Check if the word will start or end at a letter, or borders one top or bottom
+                let borders_start = self.get_val(row_idx, col_idx) != EMPTY_VALUE;
+                let borders_end = self.get_val(row_idx, col_idx+word.len()-1) != EMPTY_VALUE;
+                let borders_top_or_bottom = if row_idx == 0 {
+                    (col_idx..col_idx+word.len()).any(|c_idx| self.get_val(1, c_idx) != EMPTY_VALUE)
+                }
+                else if row_idx == BOARD_SIZE-1 {
+                    (col_idx..col_idx+word.len()).any(|c_idx| self.get_val(BOARD_SIZE-2, c_idx) != EMPTY_VALUE)
+                }
+                else {
+                    (col_idx..col_idx+word.len()).any(|c_idx| self.get_val(row_idx-1, c_idx) != EMPTY_VALUE || self.get_val(row_idx+1, c_idx) != EMPTY_VALUE)
+                };
+                if !(borders_start || borders_end || borders_top_or_bottom) {
                     return (false, played_indices, remaining_letters, LetterUsage::Remaining);
                 }
                 else {
@@ -127,14 +135,22 @@ impl Board {
             },
             Direction::Vertical => {
                 let mut remaining_letters = letters.clone();
-                if row_idx + word.len() >= BOARD_SIZE {
+                if row_idx + word.len() > BOARD_SIZE {
                     return (false, played_indices, remaining_letters, LetterUsage::Remaining);
                 }
-                // Check if the word will start or end at a letter
-                let mut valid_loc = (row_idx != 0 && self.get_val(row_idx-1, col_idx) != EMPTY_VALUE) || (BOARD_SIZE-row_idx <= word.len() && self.get_val(row_idx+word.len(), col_idx) != EMPTY_VALUE);
-                // Check if the word will border any letters on the right or left
-                valid_loc |= (row_idx..row_idx+word.len()).any(|r_idx| (col_idx < BOARD_SIZE-1 && self.get_val(r_idx, col_idx+1) != EMPTY_VALUE) || (col_idx > 0 && self.get_val(r_idx, col_idx-1) != EMPTY_VALUE));
-                if !valid_loc {
+                // Check if the word will start or end at a letter, or borders one left or right
+                let borders_start = self.get_val(row_idx, col_idx) != EMPTY_VALUE;
+                let borders_end = self.get_val(row_idx+word.len()-1, col_idx) != EMPTY_VALUE;
+                let borders_left_or_right = if col_idx == 0 {
+                    (row_idx..row_idx+word.len()).any(|r_idx| self.get_val(r_idx, 1) != EMPTY_VALUE)
+                }
+                else if col_idx == BOARD_SIZE-2 {
+                    (row_idx..row_idx+word.len()).any(|r_idx| self.get_val(r_idx, BOARD_SIZE-2) != EMPTY_VALUE)
+                }
+                else {
+                    (row_idx..row_idx+word.len()).any(|r_idx| self.get_val(r_idx, col_idx-1) != EMPTY_VALUE || self.get_val(r_idx, col_idx+1) != EMPTY_VALUE)
+                };
+                if !(borders_start || borders_end || borders_left_or_right) {
                     return (false, played_indices, remaining_letters, LetterUsage::Remaining);
                 }
                 else {
@@ -233,7 +249,7 @@ fn _board_to_string(board: &Board, min_col: usize, max_col: usize, min_row: usiz
     return s.trim_end().to_owned();
 }
 
-/// Converts a `board` to a vector of vectors of chars
+/// Converts a `board` to a vector of vectors of strings
 /// # Arguments
 /// * `board` - Board to display
 /// * `min_col` - Minimum occupied column index
@@ -241,7 +257,7 @@ fn _board_to_string(board: &Board, min_col: usize, max_col: usize, min_row: usiz
 /// * `min_row` - Minimum occupied row index
 /// * `max_row` - Maximum occupied row index
 /// # Returns
-/// * `Vec<Vec<char>>` - `board` in vector form (with all numbers converted to letters)
+/// * `Vec<Vec<String>>` - `board` in vector form (with all numbers converted to letters)
 fn board_to_vec(board: &Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, previous_idxs: &HashSet<(usize, usize)>) -> Vec<Vec<String>> {
     let mut board_vec: Vec<Vec<String>> = Vec::with_capacity(max_row-min_row);
     for row in min_row..=max_row {
@@ -261,7 +277,7 @@ fn board_to_vec(board: &Board, min_col: usize, max_col: usize, min_row: usize, m
         }
         board_vec.push(row_vec);
     }
-    return board_vec;
+    board_vec
 }
 
 /// Gets which indices overlap between `previous_board` and `new_board`
@@ -287,7 +303,7 @@ fn get_board_overlap(previous_board: &Board, new_board: &Board, previous_min_col
             }
         }
     }
-    return overlapping_idxs;
+    overlapping_idxs
 }
 
 /// Gets the minimum and maximum occupied row and column from a `board` (assuming that tiles have only been removed)
@@ -339,7 +355,7 @@ fn get_new_min_max(board: &Board, old_min_col: usize, old_max_col: usize, old_mi
         }
         max_col -= 1;
     }
-    return (min_col, max_col, min_row, max_row);
+    (min_col, max_col, min_row, max_row)
 }
 
 /// Checks whether the `board` is fully connected; this code is mostly from ChatGPT
@@ -408,7 +424,6 @@ fn is_connected(board: &Board, min_col: usize, max_col: usize, min_row: usize, m
             }
         }
     }
-
     true
 }
 
@@ -488,7 +503,7 @@ fn get_removable_indices(board: &Board, min_col: usize, max_col: usize, min_row:
     if board_empty {
         return Vec::new();
     }
-    return removable;
+    removable
 }
 
 /// Checks whether a `word` can be made using the given `letters`
@@ -506,7 +521,7 @@ fn is_makeable(word: &Word, letters: &Letters) -> bool {
         let elem = available_letters.get_mut(*letter).unwrap();
         *elem -= 1;
     }
-    return true;
+    true
 }
 
 /// Checks that a `board` is valid after a word is played horizontally, given the specified list of `valid_word`s
@@ -586,7 +601,7 @@ fn is_board_valid_horizontal(board: &Board, min_col: usize, max_col: usize, min_
             return false;
         }
     }
-    return true;
+    true
 }
 
 /// Checks that a `board` is valid after a word is played vertically, given the specified list of `valid_word`s
@@ -670,7 +685,7 @@ fn is_board_valid_vertical(board: &Board, min_col: usize, max_col: usize, min_ro
             return false;
         }
     }
-    return true;
+    true
 }
 
 /// Enumeration of how many letters have been used
@@ -689,7 +704,7 @@ impl fmt::Display for LetterUsage {
             LetterUsage::Remaining => write!(f, "Remaining"),
             LetterUsage::Overused => write!(f, "Overused"),
             LetterUsage::Finished => write!(f, "Finished")
-       }
+        }
     }
 }
 impl fmt::Debug for LetterUsage {
@@ -699,7 +714,7 @@ impl fmt::Debug for LetterUsage {
             LetterUsage::Overused => write!(f, "Overused"),
             LetterUsage::Finished => write!(f, "Finished")
         }
-     }
+    }
 }
 
 /// Enumeration of the direction a word is played
@@ -712,10 +727,10 @@ enum Direction {
 }
 impl fmt::Display for Direction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-       match self {
+        match self {
             Direction::Vertical => write!(f, "Horizontal"),
             Direction::Horizontal => write!(f, "Vertical")
-       }
+        }
     }
 }
 impl fmt::Debug for Direction {
@@ -724,7 +739,7 @@ impl fmt::Debug for Direction {
             Direction::Vertical => write!(f, "Horizontal"),
             Direction::Horizontal => write!(f, "Vertical")
         }
-     }
+    }
 }
 
 /// Removes words that can't be played with `current_letters` plus a set number of `board_letters`
@@ -928,7 +943,6 @@ fn try_play_word_horizontal(board: &mut Board, word: &Word, min_col: usize, max_
         let (leftmost_col, rightmmost_col) = get_col_limits(board, row_idx, min_col, max_col);
         // For each row, try across all columns (starting from the farthest out the word could be played)
         for col_idx in leftmost_col.saturating_sub(word.len())..=BOARD_SIZE.min(rightmmost_col+1) {
-            // Using the ? because `play_word` can give an `Err` if the index is out of bounds
             let res = board.play_word(word, row_idx, col_idx, Direction::Horizontal, &letters, letters_on_board);
             if res.0 {
                 // If the word was played successfully (i.e. it's not a complete overlap and it borders at least one existing tile), then check the validity of the new words it forms
@@ -1073,7 +1087,7 @@ fn try_play_word_vertically(board: &mut Board, word: &Word, min_col: usize, max_
 /// * `usize` - Minimum occupied row index in `board`
 /// * `usize` - Maximum occupied row index in `board`
 /// 
-/// *or empty `Err` on if out-of-bounds, past the maximum number of words to check, or another thread signalled to stop*
+/// *or empty `Err` if out-of-bounds, past the maximum number of words to check, or another thread signalled to stop*
 fn play_further(board: &mut Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, valid_words_vec: &Vec<&Word>, valid_words_set: &HashSet<&Word>, letters: Letters, depth: usize, words_checked: &mut usize, letters_on_board: &mut Letters, filter_letters_on_board: usize, max_words_to_check: usize, stop_t: &Arc<AtomicBool>) -> Result<(bool, usize, usize, usize, usize), ()> {
     if *words_checked > max_words_to_check || stop_t.load(Ordering::Relaxed) {
         return Err(());
@@ -1748,7 +1762,7 @@ async fn get_playable_words(available_letters: HashMap<String, i64>, state: Stat
         }
     }
     let playable_short: Vec<String> = state.all_words_short.iter().filter(|word| is_makeable(word, &letters)).map(convert_array_to_word).collect();
-    let playable_long: Vec<String> = state.all_words_long.iter().filter(|word| is_makeable(word, &letters)).map( convert_array_to_word).collect();
+    let playable_long: Vec<String> = state.all_words_long.iter().filter(|word| is_makeable(word, &letters)).map(convert_array_to_word).collect();
     return Ok(PlayableWords { short: playable_short, long: playable_long });
 }
 
@@ -1863,7 +1877,7 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                 },
                 LetterComparison::GreaterByOne => {
                     // If only a single letter has increased by one, then first check just that letter
-                    let valid_words_set: HashSet<&Word> = HashSet::from_iter(state.all_words_short.iter().filter(|word| is_makeable(word, &letters)));
+                    let valid_words_set: HashSet<&Word> = HashSet::from_iter(dict_to_use.iter().filter(|word| is_makeable(word, &letters)));
                     let mut board = prev_state.board.clone();
                     let res = play_one_letter(&mut board, prev_state.min_col, prev_state.max_col, prev_state.min_row, prev_state.max_row, seen_greater, &valid_words_set);
                     match res {
@@ -1967,7 +1981,14 @@ async fn play_bananagrams(available_letters: HashMap<String, i64>, state: State<
                         if !stop_t.load(Ordering::Relaxed) {
                             stop_t.store(true, Ordering::Relaxed);
                             let mut ret = conn.lock().expect("Failed to get lock on shared ret_val");
-                            ret.push((board_to_vec(&board, min_col, max_col, min_row, max_row, &HashSet::new()), board.clone(), min_col, max_col, min_row, max_row));
+                            let previous_idxs: HashSet<(usize, usize)>;
+                            match cloned_previous_board {
+                                Some(prev) => {
+                                    previous_idxs = get_board_overlap(&prev.0, &board, prev.1, prev.2, prev.3, prev.4, min_col, max_col, min_row, max_row);
+                                },
+                                None => {previous_idxs = HashSet::new();}
+                            }
+                            ret.push((board_to_vec(&board, min_col, max_col, min_row, max_row, &previous_idxs), board.clone(), min_col, max_col, min_row, max_row));
                             break;
                         }
                     }

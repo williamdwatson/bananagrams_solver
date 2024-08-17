@@ -116,7 +116,7 @@ export default function LetterInput(props: LetterInputProps){
     const [lettersInvalid, setLettersInvalid] = useState<Map<string, boolean>>(invalid);
     const [typeInVisible, setTypeInVisible] = useState(false);
     const [typedIn, setTypedIn] = useState("");
-    const [randomNum, setRandomNum] = useState("21");
+    const [randomNum, setRandomNum] = useState<number|null>(21);
     const [randomFrom, setRandomFrom] = useState<"standard Bananagrams"|"double Bananagrams"|"infinite set">("standard Bananagrams");
     const [playableWordsLoading, setPlayableWordsLoading] = useState(false);
 
@@ -317,7 +317,7 @@ export default function LetterInput(props: LetterInputProps){
     const pasteRandomNum = () => {
         readText().then(val => {
             if (val != null && [...val].every(char => DIGITS.includes(char))) {
-                setRandomNum(val);
+                setRandomNum(parseInt(val));
             }
         });
     }
@@ -334,7 +334,7 @@ export default function LetterInput(props: LetterInputProps){
      * Context menu items for the random number input field
      */
     const random_num_items: MenuItem[] = [
-        { label: "Copy", icon: "pi pi-copy", command: () => writeText(randomNum) },
+        { label: "Copy", icon: "pi pi-copy", command: () => writeText(randomNum?.toString() ?? "") },
         { label: "Paste", icon: "pi pi-file-import", command: pasteRandomNum }
     ];
 
@@ -384,7 +384,7 @@ export default function LetterInput(props: LetterInputProps){
         // So the dialog has time to finish its close animation before the fields are updated
         setTimeout(() => {
             setTypedIn("");
-            setRandomNum("21");
+            setRandomNum(21);
             setRandomFrom("standard Bananagrams");
         }, 100);
     }
@@ -402,21 +402,32 @@ export default function LetterInput(props: LetterInputProps){
     }
 
     /**
+     * Callback when the "Add letters" button is clicked
+     */
+    const addLetters = () => {
+        const new_letters = new Map(letterNums);
+        UPPERCASE.forEach(c => {
+            new_letters.set(c, (new_letters.get(c) ?? 0) + count_letter_in_string(c, typedIn));
+        });
+        setLetterNums(new_letters);
+        cancelInput();
+    }
+
+    /**
      * Chooses random letters based on the user's input
      */
     const chooseRandomly = () => {
-        const val = parseInt(randomNum);
-        if (randomNum.trim() === "" || isNaN(val) || val <= 0) {
+        if (randomNum == null || isNaN(randomNum) || randomNum <= 0) {
             props.toast.current?.show({severity: "warn", summary: "Invalid number", detail: "The number of letters to choose must be greater than 0"});
         }
-        else if (val > 144 && randomFrom === "standard Bananagrams") {
+        else if (randomNum > 144 && randomFrom === "standard Bananagrams") {
             props.toast.current?.show({severity: "warn", summary: "Too many letters", detail: "No more than 144 tiles can be chosen from standard Bananagrams"});
         }
-        else if (val > 288 && randomFrom === "double Bananagrams") {
+        else if (randomNum > 288 && randomFrom === "double Bananagrams") {
             props.toast.current?.show({severity: "warn", summary: "Too many letters", detail: "No more than 288 tiles can be chosen from double Bananagrams"});
         }
         else {
-            invoke("get_random_letters", {what: randomFrom, howMany: val}).then(res => {
+            invoke("get_random_letters", {what: randomFrom, howMany: randomNum}).then(res => {
                 const result = res as Record<string, number>;
                 const new_map = new Map<string, number>();
                 UPPERCASE.forEach(c => {
@@ -438,7 +449,7 @@ export default function LetterInput(props: LetterInputProps){
             s += value ?? 0;
         }
         if (s < 2) {
-            props.toast.current?.show({"severity": "warn", "summary": "Not enough letters", "detail": "More than one letter must be present."})
+            props.toast.current?.show({"severity": "warn", "summary": "Not enough letters", "detail": "More than two letters must be present."})
         }
         else {
             setPlayableWordsLoading(true);
@@ -483,7 +494,7 @@ export default function LetterInput(props: LetterInputProps){
             s += value ?? 0;
         }
         if (s < 2) {
-            props.toast.current?.show({"severity": "warn", "summary": "Not enough letters", "detail": "More than one letter must be present."})
+            props.toast.current?.show({"severity": "warn", "summary": "Not enough letters", "detail": "More than two letters must be present."})
         }
         else {
             const letters = new Map<string, number>();
@@ -527,6 +538,8 @@ export default function LetterInput(props: LetterInputProps){
         })
         .catch(err => props.toast.current?.show({severity: "error", summary: "Could not undo", detail: err.toString()}));
     }
+
+    const no_letters = (Array.from(letterNums.values()).reduce((prev, cur) => (prev ?? 0) + (cur ?? 0)) ?? 0) === 0;
     
     return (
         <>
@@ -537,22 +550,38 @@ export default function LetterInput(props: LetterInputProps){
         <Dialog header="Input letters" visible={typeInVisible} onHide={() => setTypeInVisible(false)}>
             <TabView>
                 <TabPanel header="Type in letters">
+                {no_letters ?
                     <form onSubmit={e => {e.preventDefault(); useLetters()}} autoComplete="off">
-                        <InputText value={typedIn} onChange={e => setTypedIn(e.target.value.toUpperCase())} keyfilter="alpha" id="typeIn" onContextMenu={e => type_in_cm.current?.show(e)}/>
-                        <br/>
-                        <Button type="submit" label="Use letters" icon="pi pi-arrow-right" iconPos="right" style={{marginTop: "5px", marginRight: "5px"}}/>
-                        <Button type="reset" label="Cancel" icon="pi pi-times" iconPos="right" severity="secondary" onClick={() => cancelInput()}/>
+                        <InputText value={typedIn} onChange={e => setTypedIn(e.target.value.toUpperCase())} keyfilter="alpha" id="typeIn" onContextMenu={e => type_in_cm.current?.show(e)} style={{width: "100%"}}/>
+                        <div style={{marginTop: "5px", textAlign: "center"}}>
+                            <Button type="submit" label="Use letters" icon="pi pi-arrow-right" iconPos="right" style={{marginTop: "5px", marginRight: "5px"}}/>
+                            <Button type="reset" label="Cancel" icon="pi pi-times" iconPos="right" severity="secondary" onClick={cancelInput}/>
+                        </div>
                     </form>
+                    :
+                    <div>
+                        <InputText value={typedIn} onChange={e => setTypedIn(e.target.value.toUpperCase())} keyfilter="alpha" id="typeIn" onContextMenu={e => type_in_cm.current?.show(e)} style={{width: "100%"}}/>
+                        <div style={{marginTop: "5px", textAlign: "center"}}>
+                            <Button label="Replace letters" icon="pi pi-arrow-right" iconPos="right" onClick={useLetters}/>
+                            <Button label="Add letters" icon="pi pi-plus" iconPos="right" style={{marginLeft: "5px", marginRight: "5px"}} onClick={addLetters}/>
+                            <Button label="Cancel" icon="pi pi-times" iconPos="right" severity="secondary" onClick={cancelInput}/>
+                        </div>
+                    </div>}
                 </TabPanel>
                 <TabPanel header="Choose randomly">
                     <form onSubmit={e=> {e.preventDefault(); chooseRandomly()}} autoComplete="off">
                         <span>Choose </span>
-                        <InputText value={randomNum} onChange={e => setRandomNum(e.target.value)} keyfilter="int" size={3} onContextMenu={e => random_num_cm.current?.show(e)}/>
+                        <InputNumber value={randomNum} onChange={e => setRandomNum(e.value)} min={0} size={3} onContextMenu={e => random_num_cm.current?.show(e)}/>
                         <span> random letters from </span>
                         <Dropdown value={randomFrom} onChange={e => setRandomFrom(e.value)} options={["standard Bananagrams", "double Bananagrams", "infinite set"]}/>
                         <br/>
-                        <Button type="submit" label="Choose letters" icon="pi pi-arrow-right" iconPos="right" style={{marginTop: "5px", marginRight: "5px"}}/>
-                        <Button type="reset" label="Cancel" icon="pi pi-times" iconPos="right" severity="secondary" onClick={() => cancelInput()}/>
+                        {randomFrom === "standard Bananagrams" ? <div style={{display: "flex", justifyContent: "center", marginTop: "5px", marginBottom: "5px"}}><small>144 max</small><br/></div>
+                        : randomFrom === "double Bananagrams" ? <div style={{display: "flex", justifyContent: "center", marginTop: "5px", marginBottom: "5px"}}><small>288 max</small><br/></div>
+                        : null}
+                        <div style={{textAlign: "center"}}>
+                            <Button type="submit" label="Choose letters" icon="pi pi-arrow-right" iconPos="right" style={{marginTop: "5px", marginRight: "5px"}}/>
+                            <Button type="reset" label="Cancel" icon="pi pi-times" iconPos="right" severity="secondary" onClick={() => cancelInput()}/>
+                        </div>
                     </form>
                 </TabPanel>
             </TabView>            
@@ -573,12 +602,12 @@ export default function LetterInput(props: LetterInputProps){
             <Button type="button" label="View playable words" icon="pi pi-eye" iconPos="right" style={{padding: "8px",}} onClick={viewPlayableWords} loading={playableWordsLoading}/>
         </div>
         <div className="button-div">
-            <Dropdown placeholder="Reset" options={["Reset hand", "Reset board"]} style={{marginRight: "2%"}} onChange={e => doReset(e.value)} className="reset-dropdown" panelClassName="reset-dropdown" pt={{input: {style: {color: "white"}}, item: {className: "reset-dropdown-item"}, trigger: {style: {color: "white"}}}}/>
+            <Dropdown placeholder="Reset" options={["Reset hand", "Reset board"]} style={{marginRight: "2%"}} onChange={e => doReset(e.value)} disabled={props.running} className="reset-dropdown" panelClassName="reset-dropdown" pt={{input: {style: {color: "white"}}, item: {className: "reset-dropdown-item"}, trigger: {style: {color: "white"}}}}/>
             <Button type="button" label="Solve" icon="pi pi-arrow-right" iconPos="right" severity="success" onClick={solve} loading={props.running}/>
         </div>
         <div className="button-div" style={{marginTop: "15px"}}>
-            <Button label="Undo" icon="pi pi-undo" iconPos="right" onClick={undo} style={{marginRight: "2%"}} disabled={!props.undoPossible}/>
-            <Button label="Redo" icon="pi pi-refresh" iconPos="right" onClick={redo} disabled={!props.redoPossible}/>
+            <Button label="Undo" icon="pi pi-undo" iconPos="right" onClick={undo} style={{marginRight: "2%"}} disabled={props.running || !props.undoPossible}/>
+            <Button label="Redo" icon="pi pi-refresh" iconPos="right" onClick={redo} disabled={props.running || !props.redoPossible}/>
         </div>
         </>
     )

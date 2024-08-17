@@ -8,6 +8,7 @@ import html2canvas from "html2canvas";
 import SolutionTime from "./solution_time";
 import { result_t } from "./types";
 import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
+import WrapperControls from "./wrapper_controls";
 
 interface ResultsDisplayProps {
     /**
@@ -191,6 +192,7 @@ export default function ResultsDisplay(props: ResultsDisplayProps) {
         {props.results == null || props.results.board.length === 0 ? null :
         <>
         <TransformWrapper centerOnInit onPanningStart={() => document.getElementById("results-table")!.style.cursor = "grabbing"} onPanningStop={() => document.getElementById("results-table")!.style.cursor = "grab"}>
+            <WrapperControls/>
             <TransformComponent wrapperStyle={{width: "100%", height: "calc(100% - 4ch)"}}>
                 <table id="results-table">
                     <tbody className="results-tbody">
@@ -202,10 +204,10 @@ export default function ResultsDisplay(props: ResultsDisplayProps) {
                                             return <td key={"row-"+i+"-cell-"+j} className="emptyCell"></td>
                                         }
                                         else if (val.length === 2) {
-                                            return <td key={"row-"+i+"-cell-"+j} className="previouslyPlayedCell">{val.charAt(0)}</td>
+                                            return <td key={"row-"+i+"-cell-"+j} className="previouslyPlayedCell" aria-label={`Row ${i}, column ${j}: ${val.charAt(0)} (previously played)`}>{val.charAt(0)}</td>
                                         }
                                         else {
-                                            return <td key={"row-"+i+"-cell-"+j} className="occupiedCell">{val}</td>
+                                            return <td key={"row-"+i+"-cell-"+j} className="occupiedCell" aria-label={`Row ${i}, column ${j}: ${val}`}>{val}</td>
                                         }
                                     })}
                                 </tr>

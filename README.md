@@ -44,6 +44,8 @@ For performance metrics, a random selection of _n_ letters was taken from the se
 
 *Density of tiles played in letters per square (i.e. number of letters in hand/dimensions of board)*
 
+All statistics were collected on my machine (Windows 10, 8GB RAM, Intel i7-6700HQ CPU).
+
 ## Code Layout
 The `src` folder holds the frontend code, written in Typescript/React. `App.tsx` is the parent of the frontend components (technically `main.tsx` is the parent, but it is essentially a wrapper); the components include `letter_input.tsx` for inputing which letters are in the hand and `results_display.tsx` which dislays the results as a table.
 

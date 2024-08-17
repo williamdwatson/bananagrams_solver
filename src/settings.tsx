@@ -74,33 +74,33 @@ export default function Settings(props: SettingsProps) {
         <>
         <Dialog header="Settings" visible={showSettings} onHide={() => setShowSettings(false)}>
             <div className="settings-div">
-                <label htmlFor="filter_letters_on_board">Usable letters on board:</label> <InputNumber value={filterLettersOnBoard} onChange={e => setFilterLettersOnBoard(e.value)} min={0} inputId="filter_letters_on_board"/>
+                <label htmlFor="filter_letters_on_board">Usable letters on board:</label> <InputNumber value={filterLettersOnBoard} onChange={e => setFilterLettersOnBoard(e.value)} min={0} max={2**32-1} inputId="filter_letters_on_board"/>
                 <OverlayPanel ref={filterLettersInfo} style={{maxWidth: "33vw"}}>
                     <p>The maximum number of letters on the board that can be used in conjuction with letters in the hand when filtering playable words</p>
                     <p><strong>Lower values:</strong> <em>Usually</em> faster solutions</p>
                     <p><strong>Higher values:</strong> <em>Usually</em> slower solutions, but more likely to find a solution if one exists. For an exhaustive search, use a value greater than the total number of letters.</p>
                 </OverlayPanel>
-                <i className="pi pi-info-circle info-overlay" onClick={e => filterLettersInfo.current?.toggle(e)}></i>
+                <i className="pi pi-info-circle info-overlay" onClick={e => filterLettersInfo.current?.toggle(e)} aria-haspopup></i>
             </div>
             <div className="settings-div">
-                <label htmlFor="max_words_to_check">Maximum iterations:</label> <InputNumber value={maximumWordsToCheck} onChange={e => setMaximumWordsToCheck(e.value)} min={0} inputId="max_words_to_check"/>
+                <label htmlFor="max_words_to_check">Maximum iterations:</label> <InputNumber value={maximumWordsToCheck} onChange={e => setMaximumWordsToCheck(e.value)} min={0} max={2**32-1} inputId="max_words_to_check"/>
                 <OverlayPanel ref={maxWordsInfo} style={{maxWidth: "33vw"}}>
-                    <p>The maximum number of iterations before the solver stops and returns no solution (i.e. a "dump")</p>
+                    <p>The maximum number of iterations before the solver stops and returns no solution (i.e. a "dump") - this applies separately to each of the first six words checked</p>
                     <p><strong>Lower values:</strong> Faster "dump" solutions</p>
                     <p><strong>Higher values:</strong> Slower "dump" solutions, but more likely to find a solution if one exists. For an exhaustive search, use a very large value.</p>
                 </OverlayPanel>
-                <i className="pi pi-info-circle info-overlay" onClick={e => maxWordsInfo.current?.toggle(e)}></i>
+                <i className="pi pi-info-circle info-overlay" onClick={e => maxWordsInfo.current?.toggle(e)} aria-haspopup></i>
             </div>
             <div className="settings-div">
                 <label htmlFor="use_dictionary">Dictionary:</label> <Dropdown value={whichDictionary} onChange={e => setWhichDictionary(e.value)} options={["Short", "Full"]} inputId="use_dictionary"/>
                 <OverlayPanel ref={whichDictionaryInfo} style={{maxWidth: "33vw"}}>
                     <p>Which dictionary to use</p>
-                    <p><strong>Short:</strong> Contains 30,519 words</p>
+                    <p><strong>Short:</strong> Contains 30,515 words</p>
                     <p><strong>Full:</strong> Contains 178,663 words, including some that some players might consider questionable</p>
                 </OverlayPanel>
-                <i className="pi pi-info-circle info-overlay" onClick={e => whichDictionaryInfo.current?.toggle(e)}></i>
+                <i className="pi pi-info-circle info-overlay" onClick={e => whichDictionaryInfo.current?.toggle(e)} aria-haspopup></i>
             </div>
-            <div>
+            <div style={{display: "flex", justifyContent: "center", marginTop: "15px"}}>
                 <Button label="Use settings" icon="pi pi-arrow-right" iconPos="right" onClick={setSettings}/>
                 <Button label="Cancel" icon="pi pi-times" iconPos="right" severity="secondary" onClick={() => setShowSettings(false)} style={{marginLeft: "5px"}}/>
             </div>
@@ -117,41 +117,41 @@ export default function Settings(props: SettingsProps) {
             </p>
             <p>
                 Dictionaries are derived from several sources and are available on this project's <LinkWrapper href="https://github.com/williamdwatson/bananagrams_solver">GitHub</LinkWrapper>:
-                <ul>
-                    <li>
-                        Full dictionary:
-                        <ul>
-                            Taken from <LinkWrapper href="https://github.com/redbo/scrabble/blob/05748fb060b6e20480424b9113c1610066daca3c/dictionary.txt">here</LinkWrapper>, with minimal manual editing
-                        </ul>
-                    </li>
-                    <li>
-                        Short dictionary:
-                        <ul>
-                            <li>
-                                Lists from <LinkWrapper href="https://people.sc.fsu.edu/~jburkardt/datasets/words/words.html">here</LinkWrapper> under the <LinkWrapper href="https://www.gnu.org/licenses/lgpl-3.0.en.html#license-text)">LGPL license</LinkWrapper>:
-                                <ul>
-                                    <li>basic_english_850.txt</li>
-                                    <li>basic_english_2000.txt</li>
-                                    <li>doublet_words.txt</li>
-                                    <li>globish.txt</li>
-                                    <li>simplified_english.txt</li>
-                                    <li>special_english.txt</li>
-                                    <li>unique_grams.txt</li>
-                                </ul>
-                            </li>
-                            <li>
-                                Lists from <LinkWrapper href="https://github.com/MichaelWehar/Public-Domain-Word-Lists">here</LinkWrapper> in the public domain:
-                                <ul>
-                                    <li>200-less-common.txt</li>
-                                    <li>5000-more-common.txt</li>
-                                </ul>
-                            </li>
-                            <li><LinkWrapper href="https://www.mit.edu/~ecprice/wordlist.10000">MIT's 10000 word list</LinkWrapper></li>
-                            <li><LinkWrapper href="https://github.com/first20hours/google-10000-english">10000 word list derived from Google</LinkWrapper></li>
-                        </ul>
-                    </li>
-                </ul>
             </p>
+            <ul>
+                <li>
+                    Full dictionary:
+                    <ul>
+                        Taken from <LinkWrapper href="https://github.com/redbo/scrabble/blob/05748fb060b6e20480424b9113c1610066daca3c/dictionary.txt">here</LinkWrapper>, with minimal manual editing
+                    </ul>
+                </li>
+                <li>
+                    Short dictionary:
+                    <ul>
+                        <li>
+                            Lists from <LinkWrapper href="https://people.sc.fsu.edu/~jburkardt/datasets/words/words.html">here</LinkWrapper> under the <LinkWrapper href="https://www.gnu.org/licenses/lgpl-3.0.en.html#license-text)">LGPL license</LinkWrapper>:
+                            <ul>
+                                <li>basic_english_850.txt</li>
+                                <li>basic_english_2000.txt</li>
+                                <li>doublet_words.txt</li>
+                                <li>globish.txt</li>
+                                <li>simplified_english.txt</li>
+                                <li>special_english.txt</li>
+                                <li>unique_grams.txt</li>
+                            </ul>
+                        </li>
+                        <li>
+                            Lists from <LinkWrapper href="https://github.com/MichaelWehar/Public-Domain-Word-Lists">here</LinkWrapper> in the public domain:
+                            <ul>
+                                <li>200-less-common.txt</li>
+                                <li>5000-more-common.txt</li>
+                            </ul>
+                        </li>
+                        <li><LinkWrapper href="https://www.mit.edu/~ecprice/wordlist.10000">MIT's 10000 word list</LinkWrapper></li>
+                        <li><LinkWrapper href="https://github.com/first20hours/google-10000-english">10000 word list derived from Google</LinkWrapper></li>
+                    </ul>
+                </li>
+            </ul>
         </Dialog>
         <div style={{marginTop: "5vh", width: "100%", display: "flex", justifyContent: "center"}}>
             <Button label="Settings" icon="pi pi-cog" iconPos="right" onClick={() => setShowSettings(true)}/>
