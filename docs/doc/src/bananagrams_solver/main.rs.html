@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/main.rs`."><title>main.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="bananagrams_solver" data-themes="" data-resource-suffix="" data-rustdoc-version="1.80.0 (051478957 2024-07-21)" data-channel="1.80.0" data-search-js="search-d52510db62a78183.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/main.rs`."><title>main.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="bananagrams_solver" data-themes="" data-resource-suffix="" data-rustdoc-version="1.80.1 (3f5fd8dd4 2024-08-06)" data-channel="1.80.1" data-search-js="search-d52510db62a78183.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -2051,6 +2051,27 @@
 <a href="#2051" id="2051">2051</a>
 <a href="#2052" id="2052">2052</a>
 <a href="#2053" id="2053">2053</a>
+<a href="#2054" id="2054">2054</a>
+<a href="#2055" id="2055">2055</a>
+<a href="#2056" id="2056">2056</a>
+<a href="#2057" id="2057">2057</a>
+<a href="#2058" id="2058">2058</a>
+<a href="#2059" id="2059">2059</a>
+<a href="#2060" id="2060">2060</a>
+<a href="#2061" id="2061">2061</a>
+<a href="#2062" id="2062">2062</a>
+<a href="#2063" id="2063">2063</a>
+<a href="#2064" id="2064">2064</a>
+<a href="#2065" id="2065">2065</a>
+<a href="#2066" id="2066">2066</a>
+<a href="#2067" id="2067">2067</a>
+<a href="#2068" id="2068">2068</a>
+<a href="#2069" id="2069">2069</a>
+<a href="#2070" id="2070">2070</a>
+<a href="#2071" id="2071">2071</a>
+<a href="#2072" id="2072">2072</a>
+<a href="#2073" id="2073">2073</a>
+<a href="#2074" id="2074">2074</a>
 </pre></div><pre class="rust"><code><span class="comment">// Prevents additional console window on Windows in release, DO NOT REMOVE!!
 </span><span class="attr">#![cfg_attr(not(debug_assertions), windows_subsystem = <span class="string">"windows"</span>)]
 
@@ -2142,14 +2163,22 @@
         <span class="kw">match </span>direction {
             Direction::Horizontal =&gt; {
                 <span class="kw">let </span><span class="kw-2">mut </span>remaining_letters = letters.clone();
-                <span class="kw">if </span>col_idx + word.len() &gt;= BOARD_SIZE {
+                <span class="kw">if </span>col_idx + word.len() &gt; BOARD_SIZE {
                     <span class="kw">return </span>(<span class="bool-val">false</span>, played_indices, remaining_letters, LetterUsage::Remaining);
                 }
-                <span class="comment">// Check if the word will start or end at a letter
-                </span><span class="kw">let </span><span class="kw-2">mut </span>valid_loc = (col_idx != <span class="number">0 </span>&amp;&amp; <span class="self">self</span>.get_val(row_idx, col_idx-<span class="number">1</span>) != EMPTY_VALUE) || (BOARD_SIZE-col_idx &lt;= word.len() &amp;&amp; <span class="self">self</span>.get_val(row_idx, col_idx+word.len()) != EMPTY_VALUE);
-                <span class="comment">// Check if the word will border any letters on the top or bottom
-                </span>valid_loc |= (col_idx..col_idx+word.len()).any(|c_idx| (row_idx &lt; BOARD_SIZE-<span class="number">1 </span>&amp;&amp; <span class="self">self</span>.get_val(row_idx+<span class="number">1</span>, c_idx) != EMPTY_VALUE) || (row_idx &gt; <span class="number">0 </span>&amp;&amp; <span class="self">self</span>.get_val(row_idx-<span class="number">1</span>, c_idx) != EMPTY_VALUE));
-                <span class="kw">if </span>!valid_loc {
+                <span class="comment">// Check if the word will start or end at a letter, or borders one top or bottom
+                </span><span class="kw">let </span>borders_start = <span class="self">self</span>.get_val(row_idx, col_idx) != EMPTY_VALUE;
+                <span class="kw">let </span>borders_end = <span class="self">self</span>.get_val(row_idx, col_idx+word.len()-<span class="number">1</span>) != EMPTY_VALUE;
+                <span class="kw">let </span>borders_top_or_bottom = <span class="kw">if </span>row_idx == <span class="number">0 </span>{
+                    (col_idx..col_idx+word.len()).any(|c_idx| <span class="self">self</span>.get_val(<span class="number">1</span>, c_idx) != EMPTY_VALUE)
+                }
+                <span class="kw">else if </span>row_idx == BOARD_SIZE-<span class="number">1 </span>{
+                    (col_idx..col_idx+word.len()).any(|c_idx| <span class="self">self</span>.get_val(BOARD_SIZE-<span class="number">2</span>, c_idx) != EMPTY_VALUE)
+                }
+                <span class="kw">else </span>{
+                    (col_idx..col_idx+word.len()).any(|c_idx| <span class="self">self</span>.get_val(row_idx-<span class="number">1</span>, c_idx) != EMPTY_VALUE || <span class="self">self</span>.get_val(row_idx+<span class="number">1</span>, c_idx) != EMPTY_VALUE)
+                };
+                <span class="kw">if </span>!(borders_start || borders_end || borders_top_or_bottom) {
                     <span class="kw">return </span>(<span class="bool-val">false</span>, played_indices, remaining_letters, LetterUsage::Remaining);
                 }
                 <span class="kw">else </span>{
@@ -2180,14 +2209,22 @@
             },
             Direction::Vertical =&gt; {
                 <span class="kw">let </span><span class="kw-2">mut </span>remaining_letters = letters.clone();
-                <span class="kw">if </span>row_idx + word.len() &gt;= BOARD_SIZE {
+                <span class="kw">if </span>row_idx + word.len() &gt; BOARD_SIZE {
                     <span class="kw">return </span>(<span class="bool-val">false</span>, played_indices, remaining_letters, LetterUsage::Remaining);
                 }
-                <span class="comment">// Check if the word will start or end at a letter
-                </span><span class="kw">let </span><span class="kw-2">mut </span>valid_loc = (row_idx != <span class="number">0 </span>&amp;&amp; <span class="self">self</span>.get_val(row_idx-<span class="number">1</span>, col_idx) != EMPTY_VALUE) || (BOARD_SIZE-row_idx &lt;= word.len() &amp;&amp; <span class="self">self</span>.get_val(row_idx+word.len(), col_idx) != EMPTY_VALUE);
-                <span class="comment">// Check if the word will border any letters on the right or left
-                </span>valid_loc |= (row_idx..row_idx+word.len()).any(|r_idx| (col_idx &lt; BOARD_SIZE-<span class="number">1 </span>&amp;&amp; <span class="self">self</span>.get_val(r_idx, col_idx+<span class="number">1</span>) != EMPTY_VALUE) || (col_idx &gt; <span class="number">0 </span>&amp;&amp; <span class="self">self</span>.get_val(r_idx, col_idx-<span class="number">1</span>) != EMPTY_VALUE));
-                <span class="kw">if </span>!valid_loc {
+                <span class="comment">// Check if the word will start or end at a letter, or borders one left or right
+                </span><span class="kw">let </span>borders_start = <span class="self">self</span>.get_val(row_idx, col_idx) != EMPTY_VALUE;
+                <span class="kw">let </span>borders_end = <span class="self">self</span>.get_val(row_idx+word.len()-<span class="number">1</span>, col_idx) != EMPTY_VALUE;
+                <span class="kw">let </span>borders_left_or_right = <span class="kw">if </span>col_idx == <span class="number">0 </span>{
+                    (row_idx..row_idx+word.len()).any(|r_idx| <span class="self">self</span>.get_val(r_idx, <span class="number">1</span>) != EMPTY_VALUE)
+                }
+                <span class="kw">else if </span>col_idx == BOARD_SIZE-<span class="number">2 </span>{
+                    (row_idx..row_idx+word.len()).any(|r_idx| <span class="self">self</span>.get_val(r_idx, BOARD_SIZE-<span class="number">2</span>) != EMPTY_VALUE)
+                }
+                <span class="kw">else </span>{
+                    (row_idx..row_idx+word.len()).any(|r_idx| <span class="self">self</span>.get_val(r_idx, col_idx-<span class="number">1</span>) != EMPTY_VALUE || <span class="self">self</span>.get_val(r_idx, col_idx+<span class="number">1</span>) != EMPTY_VALUE)
+                };
+                <span class="kw">if </span>!(borders_start || borders_end || borders_left_or_right) {
                     <span class="kw">return </span>(<span class="bool-val">false</span>, played_indices, remaining_letters, LetterUsage::Remaining);
                 }
                 <span class="kw">else </span>{
@@ -2286,7 +2323,7 @@
     <span class="kw">return </span>s.trim_end().to_owned();
 }
 
-<span class="doccomment">/// Converts a `board` to a vector of vectors of chars
+<span class="doccomment">/// Converts a `board` to a vector of vectors of strings
 /// # Arguments
 /// * `board` - Board to display
 /// * `min_col` - Minimum occupied column index
@@ -2294,7 +2331,7 @@
 /// * `min_row` - Minimum occupied row index
 /// * `max_row` - Maximum occupied row index
 /// # Returns
-/// * `Vec&lt;Vec&lt;char&gt;&gt;` - `board` in vector form (with all numbers converted to letters)
+/// * `Vec&lt;Vec&lt;String&gt;&gt;` - `board` in vector form (with all numbers converted to letters)
 </span><span class="kw">fn </span>board_to_vec(board: <span class="kw-2">&amp;</span>Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, previous_idxs: <span class="kw-2">&amp;</span>HashSet&lt;(usize, usize)&gt;) -&gt; Vec&lt;Vec&lt;String&gt;&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>board_vec: Vec&lt;Vec&lt;String&gt;&gt; = Vec::with_capacity(max_row-min_row);
     <span class="kw">for </span>row <span class="kw">in </span>min_row..=max_row {
@@ -2314,7 +2351,7 @@
         }
         board_vec.push(row_vec);
     }
-    <span class="kw">return </span>board_vec;
+    board_vec
 }
 
 <span class="doccomment">/// Gets which indices overlap between `previous_board` and `new_board`
@@ -2340,7 +2377,7 @@
             }
         }
     }
-    <span class="kw">return </span>overlapping_idxs;
+    overlapping_idxs
 }
 
 <span class="doccomment">/// Gets the minimum and maximum occupied row and column from a `board` (assuming that tiles have only been removed)
@@ -2392,7 +2429,7 @@
         }
         max_col -= <span class="number">1</span>;
     }
-    <span class="kw">return </span>(min_col, max_col, min_row, max_row);
+    (min_col, max_col, min_row, max_row)
 }
 
 <span class="doccomment">/// Checks whether the `board` is fully connected; this code is mostly from ChatGPT
@@ -2461,7 +2498,6 @@
             }
         }
     }
-
     <span class="bool-val">true
 </span>}
 
@@ -2541,7 +2577,7 @@
     <span class="kw">if </span>board_empty {
         <span class="kw">return </span>Vec::new();
     }
-    <span class="kw">return </span>removable;
+    removable
 }
 
 <span class="doccomment">/// Checks whether a `word` can be made using the given `letters`
@@ -2559,8 +2595,8 @@
         <span class="kw">let </span>elem = available_letters.get_mut(<span class="kw-2">*</span>letter).unwrap();
         <span class="kw-2">*</span>elem -= <span class="number">1</span>;
     }
-    <span class="kw">return </span><span class="bool-val">true</span>;
-}
+    <span class="bool-val">true
+</span>}
 
 <span class="doccomment">/// Checks that a `board` is valid after a word is played horizontally, given the specified list of `valid_word`s
 /// Note that this does not check if all words are contiguous; this condition must be enforced elsewhere.
@@ -2639,8 +2675,8 @@
             <span class="kw">return </span><span class="bool-val">false</span>;
         }
     }
-    <span class="kw">return </span><span class="bool-val">true</span>;
-}
+    <span class="bool-val">true
+</span>}
 
 <span class="doccomment">/// Checks that a `board` is valid after a word is played vertically, given the specified list of `valid_word`s
 /// Note that this does not check if all words are contiguous; this condition must be enforced elsewhere.
@@ -2723,8 +2759,8 @@
             <span class="kw">return </span><span class="bool-val">false</span>;
         }
     }
-    <span class="kw">return </span><span class="bool-val">true</span>;
-}
+    <span class="bool-val">true
+</span>}
 
 <span class="doccomment">/// Enumeration of how many letters have been used
 </span><span class="attr">#[derive(Copy, Clone)]
@@ -2742,7 +2778,7 @@
             LetterUsage::Remaining =&gt; <span class="macro">write!</span>(f, <span class="string">"Remaining"</span>),
             LetterUsage::Overused =&gt; <span class="macro">write!</span>(f, <span class="string">"Overused"</span>),
             LetterUsage::Finished =&gt; <span class="macro">write!</span>(f, <span class="string">"Finished"</span>)
-       }
+        }
     }
 }
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>LetterUsage {
@@ -2752,7 +2788,7 @@
             LetterUsage::Overused =&gt; <span class="macro">write!</span>(f, <span class="string">"Overused"</span>),
             LetterUsage::Finished =&gt; <span class="macro">write!</span>(f, <span class="string">"Finished"</span>)
         }
-     }
+    }
 }
 
 <span class="doccomment">/// Enumeration of the direction a word is played
@@ -2765,10 +2801,10 @@
 }
 <span class="kw">impl </span>fmt::Display <span class="kw">for </span>Direction {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
-       <span class="kw">match </span><span class="self">self </span>{
+        <span class="kw">match </span><span class="self">self </span>{
             Direction::Vertical =&gt; <span class="macro">write!</span>(f, <span class="string">"Horizontal"</span>),
             Direction::Horizontal =&gt; <span class="macro">write!</span>(f, <span class="string">"Vertical"</span>)
-       }
+        }
     }
 }
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>Direction {
@@ -2777,7 +2813,7 @@
             Direction::Vertical =&gt; <span class="macro">write!</span>(f, <span class="string">"Horizontal"</span>),
             Direction::Horizontal =&gt; <span class="macro">write!</span>(f, <span class="string">"Vertical"</span>)
         }
-     }
+    }
 }
 
 <span class="doccomment">/// Removes words that can't be played with `current_letters` plus a set number of `board_letters`
@@ -2981,8 +3017,7 @@
         <span class="kw">let </span>(leftmost_col, rightmmost_col) = get_col_limits(board, row_idx, min_col, max_col);
         <span class="comment">// For each row, try across all columns (starting from the farthest out the word could be played)
         </span><span class="kw">for </span>col_idx <span class="kw">in </span>leftmost_col.saturating_sub(word.len())..=BOARD_SIZE.min(rightmmost_col+<span class="number">1</span>) {
-            <span class="comment">// Using the ? because `play_word` can give an `Err` if the index is out of bounds
-            </span><span class="kw">let </span>res = board.play_word(word, row_idx, col_idx, Direction::Horizontal, <span class="kw-2">&amp;</span>letters, letters_on_board);
+            <span class="kw">let </span>res = board.play_word(word, row_idx, col_idx, Direction::Horizontal, <span class="kw-2">&amp;</span>letters, letters_on_board);
             <span class="kw">if </span>res.<span class="number">0 </span>{
                 <span class="comment">// If the word was played successfully (i.e. it's not a complete overlap and it borders at least one existing tile), then check the validity of the new words it forms
                 </span><span class="kw">let </span>new_min_col = min_col.min(col_idx);
@@ -3126,7 +3161,7 @@
 /// * `usize` - Minimum occupied row index in `board`
 /// * `usize` - Maximum occupied row index in `board`
 /// 
-/// *or empty `Err` on if out-of-bounds, past the maximum number of words to check, or another thread signalled to stop*
+/// *or empty `Err` if out-of-bounds, past the maximum number of words to check, or another thread signalled to stop*
 </span><span class="kw">fn </span>play_further(board: <span class="kw-2">&amp;mut </span>Board, min_col: usize, max_col: usize, min_row: usize, max_row: usize, valid_words_vec: <span class="kw-2">&amp;</span>Vec&lt;<span class="kw-2">&amp;</span>Word&gt;, valid_words_set: <span class="kw-2">&amp;</span>HashSet&lt;<span class="kw-2">&amp;</span>Word&gt;, letters: Letters, depth: usize, words_checked: <span class="kw-2">&amp;mut </span>usize, letters_on_board: <span class="kw-2">&amp;mut </span>Letters, filter_letters_on_board: usize, max_words_to_check: usize, stop_t: <span class="kw-2">&amp;</span>Arc&lt;AtomicBool&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(bool, usize, usize, usize, usize), ()&gt; {
     <span class="kw">if </span><span class="kw-2">*</span>words_checked &gt; max_words_to_check || stop_t.load(Ordering::Relaxed) {
         <span class="kw">return </span><span class="prelude-val">Err</span>(());
@@ -3801,7 +3836,7 @@
         }
     }
     <span class="kw">let </span>playable_short: Vec&lt;String&gt; = state.all_words_short.iter().filter(|word| is_makeable(word, <span class="kw-2">&amp;</span>letters)).map(convert_array_to_word).collect();
-    <span class="kw">let </span>playable_long: Vec&lt;String&gt; = state.all_words_long.iter().filter(|word| is_makeable(word, <span class="kw-2">&amp;</span>letters)).map( convert_array_to_word).collect();
+    <span class="kw">let </span>playable_long: Vec&lt;String&gt; = state.all_words_long.iter().filter(|word| is_makeable(word, <span class="kw-2">&amp;</span>letters)).map(convert_array_to_word).collect();
     <span class="kw">return </span><span class="prelude-val">Ok</span>(PlayableWords { short: playable_short, long: playable_long });
 }
 
@@ -3916,7 +3951,7 @@
                 },
                 LetterComparison::GreaterByOne =&gt; {
                     <span class="comment">// If only a single letter has increased by one, then first check just that letter
-                    </span><span class="kw">let </span>valid_words_set: HashSet&lt;<span class="kw-2">&amp;</span>Word&gt; = HashSet::from_iter(state.all_words_short.iter().filter(|word| is_makeable(word, <span class="kw-2">&amp;</span>letters)));
+                    </span><span class="kw">let </span>valid_words_set: HashSet&lt;<span class="kw-2">&amp;</span>Word&gt; = HashSet::from_iter(dict_to_use.iter().filter(|word| is_makeable(word, <span class="kw-2">&amp;</span>letters)));
                     <span class="kw">let </span><span class="kw-2">mut </span>board = prev_state.board.clone();
                     <span class="kw">let </span>res = play_one_letter(<span class="kw-2">&amp;mut </span>board, prev_state.min_col, prev_state.max_col, prev_state.min_row, prev_state.max_row, seen_greater, <span class="kw-2">&amp;</span>valid_words_set);
                     <span class="kw">match </span>res {
@@ -4020,7 +4055,14 @@
                         <span class="kw">if </span>!stop_t.load(Ordering::Relaxed) {
                             stop_t.store(<span class="bool-val">true</span>, Ordering::Relaxed);
                             <span class="kw">let </span><span class="kw-2">mut </span>ret = conn.lock().expect(<span class="string">"Failed to get lock on shared ret_val"</span>);
-                            ret.push((board_to_vec(<span class="kw-2">&amp;</span>board, min_col, max_col, min_row, max_row, <span class="kw-2">&amp;</span>HashSet::new()), board.clone(), min_col, max_col, min_row, max_row));
+                            <span class="kw">let </span>previous_idxs: HashSet&lt;(usize, usize)&gt;;
+                            <span class="kw">match </span>cloned_previous_board {
+                                <span class="prelude-val">Some</span>(prev) =&gt; {
+                                    previous_idxs = get_board_overlap(<span class="kw-2">&amp;</span>prev.<span class="number">0</span>, <span class="kw-2">&amp;</span>board, prev.<span class="number">1</span>, prev.<span class="number">2</span>, prev.<span class="number">3</span>, prev.<span class="number">4</span>, min_col, max_col, min_row, max_row);
+                                },
+                                <span class="prelude-val">None </span>=&gt; {previous_idxs = HashSet::new();}
+                            }
+                            ret.push((board_to_vec(<span class="kw-2">&amp;</span>board, min_col, max_col, min_row, max_row, <span class="kw-2">&amp;</span>previous_idxs), board.clone(), min_col, max_col, min_row, max_row));
                             <span class="kw">break</span>;
                         }
                     }
